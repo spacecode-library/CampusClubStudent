@@ -35,7 +35,7 @@ import ApiService from '../services/ApiService';
 import { MotiView } from 'moti';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-// import { SharedElement } from 'react-navigation-shared-element';
+import { SharedElement } from '../components/mocks/SharedElement';
 import Skeleton from '../components/SkeletonLoader';
 import DiscountBadge from '../components/DiscountBadge'; 
 
@@ -359,7 +359,9 @@ const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         onPress={() => handleDiscountPress(item)}
         activeOpacity={0.9}
       >
-        <View
+        <SharedElement 
+          id={`discount.${item._id}.card`}
+          style={styles.featuredCardWrapper}
         >
           <MotiView
             style={[
@@ -453,7 +455,7 @@ const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               </View>
             </View>
           </MotiView>
-        </View>
+        </SharedElement>
       </TouchableOpacity>
     );
   };

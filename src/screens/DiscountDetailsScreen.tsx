@@ -26,7 +26,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { DiscountData } from '../components/DiscountCard';
-import { SharedElement } from 'react-navigation-shared-element';
+import { SharedElement } from '../components/mocks/SharedElement';
 import { MotiView } from 'moti';
 import LottieView from 'lottie-react-native';
 import ApiService from '../services/ApiService';
