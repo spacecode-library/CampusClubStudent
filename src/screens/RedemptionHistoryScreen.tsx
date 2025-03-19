@@ -9,6 +9,7 @@ import {
   Animated,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { CommonActions } from '@react-navigation/native';
 import { RootStackParamList } from '../../App';
 import { useTheme } from '../context/ThemeContext';
 import Text from '../components/Text';
@@ -19,6 +20,8 @@ import { CalendarIcon, FilterIcon, SaleTagIcon } from '../components/icons';
 import ApiService from '../services/ApiService';
 import Skeleton from '../components/SkeletonLoader';
 import { MotiView } from 'moti';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 
 type RedemptionHistoryScreenNavigationProp = StackNavigationProp<RootStackParamList, 'RedemptionHistory'>;
 
@@ -85,15 +88,18 @@ const RedemptionHistoryScreen: React.FC<RedemptionHistoryScreenProps> = ({ navig
       
       // Mock studentId for testing or get it from another source
       // This fixes the void return type error
-      let studentId: string;
+      let studentId: string = 'defaultStudentId';
       try {
-        // Try to get studentId from the service
-        const id = await ApiService.getStudentId();
-        // Handle the case where getStudentId returns void
-        studentId = typeof id === 'string' ? id : 'defaultStudentId';
+        // Try to get user info from AsyncStorage
+        const userInfo = await AsyncStorage.getItem('@campusclub:user');
+        if (userInfo) {
+          const userData = JSON.parse(userInfo);
+          if (userData.id) {
+            studentId = userData.id;
+          }
+        }
       } catch (error) {
         console.error('Error getting student ID:', error);
-        studentId = 'defaultStudentId'; // Fallback ID for testing
       }
       
       const response = await ApiService.getRedemptionHistory(studentId);
@@ -279,12 +285,8 @@ const RedemptionHistoryScreen: React.FC<RedemptionHistoryScreenProps> = ({ navig
     );
   };
   
-// Fix for the ListEmptyComponent error - separate out the empty state component
-const EmptyState = ({ navigation, colors, theme }: { 
-    navigation: RedemptionHistoryScreenNavigationProp; 
-    colors: any; 
-    theme: string; 
-  }) => {
+  // Empty state component
+  const EmptyState = () => {
     return (
       <View style={styles.emptyContainer}>
         <View
@@ -459,31 +461,31 @@ const EmptyState = ({ navigation, colors, theme }: {
       
       {/* Main Content */}
       <Animated.FlatList
-  data={redemptions}
-  renderItem={renderRedemptionItem}
-  keyExtractor={item => item._id}
-  contentContainerStyle={[
-    styles.listContent,
-    { paddingTop: moderateScale(120) + insets.top },
-    redemptions.length === 0 && { flex: 1 }
-  ]}
-  ListEmptyComponent={loading ? <LoadingComponent /> : <EmptyState navigation={navigation} colors={colors} theme={theme} />}
-  onScroll={Animated.event(
-    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-    { useNativeDriver: false }
-  )}
-  scrollEventThrottle={16}
-  refreshControl={
-    <RefreshControl
-      refreshing={refreshing}
-      onRefresh={handleRefresh}
-      tintColor={colors.primary}
-      colors={[colors.primary]}
-      progressViewOffset={moderateScale(120) + insets.top}
-    />
-  }
-  showsVerticalScrollIndicator={false}
-/>
+        data={redemptions}
+        renderItem={renderRedemptionItem}
+        keyExtractor={item => item._id}
+        contentContainerStyle={[
+          styles.listContent,
+          { paddingTop: moderateScale(120) + insets.top },
+          redemptions.length === 0 && { flex: 1 }
+        ]}
+        ListEmptyComponent={loading ? <LoadingComponent /> : <EmptyState />}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false }
+        )}
+        scrollEventThrottle={16}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+            progressViewOffset={moderateScale(120) + insets.top}
+          />
+        }
+        showsVerticalScrollIndicator={false}
+      />
     </View>
   );
 };
@@ -622,5 +624,6 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
 });
+
 
 export default RedemptionHistoryScreen;

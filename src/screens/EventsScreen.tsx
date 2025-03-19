@@ -1,5 +1,5 @@
 // src/screens/EventsScreen.tsx
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { 
   View, 
   StyleSheet, 
@@ -7,9 +7,12 @@ import {
   ScrollView, 
   TouchableOpacity, 
   Image, 
-  Animated 
+  Animated,
+  Platform,
+  RefreshControl
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { useFocusEffect } from '@react-navigation/native';
 import { RootStackParamList } from '../../App';
 import { useTheme } from '../context/ThemeContext';
 import Text from '../components/Text';
@@ -17,6 +20,8 @@ import { SPACING, BORDER_RADIUS } from '../constants/globalStyles';
 import { moderateScale } from '../utils/responsiveUtils';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CalendarIcon, LocationPinIcon } from '../components/NavigationIcons';
+import { MotiView } from 'moti';
+import * as Haptics from 'expo-haptics';
 
 type EventsScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Events'>;
 
@@ -32,12 +37,16 @@ interface EventData {
   location: string;
   image: string;
   attending: number;
+  description?: string;
+  organizer?: string;
+  isRegistered?: boolean;
 }
 
 // Interface for EventCard props
 interface EventCardProps {
   event: EventData;
   featured?: boolean;
+  onPress: (event: EventData) => void;
 }
 
 // Mock events data
@@ -48,7 +57,9 @@ const upcomingEvents: EventData[] = [
     date: 'May 15, 2025 • 8:00 PM',
     location: 'Student Union Hall',
     image: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=1470&auto=format&fit=crop',
-    attending: 142
+    attending: 142,
+    description: 'Join us for a night of music, food, and fun as we celebrate the end of the academic year! Featuring live performances from student bands and DJs.',
+    organizer: 'Student Activities Board'
   },
   {
     id: '2',
@@ -56,7 +67,9 @@ const upcomingEvents: EventData[] = [
     date: 'June 3, 2025 • 10:00 AM',
     location: 'Engineering Building',
     image: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=1470&auto=format&fit=crop',
-    attending: 89
+    attending: 89,
+    description: 'Explore the latest innovations in technology with workshops, keynote speakers, and networking opportunities with industry professionals.',
+    organizer: 'Computer Science Department'
   }
 ];
 
@@ -67,7 +80,9 @@ const popularEvents: EventData[] = [
     date: 'April 28, 2025 • 12:00 PM',
     location: 'Campus Quad',
     image: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=1374&auto=format&fit=crop',
-    attending: 210
+    attending: 210,
+    description: 'Sample cuisine from around the world prepared by international student clubs. Cultural performances and activities throughout the day.',
+    organizer: 'International Student Association'
   },
   {
     id: '4',
@@ -75,7 +90,9 @@ const popularEvents: EventData[] = [
     date: 'May 2, 2025 • 4:00 PM',
     location: 'Arts Building Gallery',
     image: 'https://images.unsplash.com/photo-1526306063970-d5498ad00f1c?q=80&w=1470&auto=format&fit=crop',
-    attending: 65
+    attending: 65,
+    description: 'View artwork created by talented student artists across various mediums. Meet the artists and learn about their creative processes.',
+    organizer: 'Fine Arts Department'
   },
   {
     id: '5',
@@ -83,7 +100,9 @@ const popularEvents: EventData[] = [
     date: 'April 20, 2025 • 9:00 AM',
     location: 'Business School Hall',
     image: 'https://images.unsplash.com/photo-1560523159-4a9692d222f9?q=80&w=1470&auto=format&fit=crop',
-    attending: 320
+    attending: 320,
+    description: 'Connect with potential employers, explore career opportunities, and learn about internships. Professional attire recommended.',
+    organizer: 'Career Services Center'
   }
 ];
 
@@ -91,6 +110,17 @@ const EventsScreen: React.FC<EventsScreenProps> = ({ navigation }) => {
   const { colors, theme } = useTheme();
   const insets = useSafeAreaInsets();
   const scrollY = React.useRef(new Animated.Value(0)).current;
+  
+  // State variables
+  const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [events, setEvents] = useState<{
+    upcoming: EventData[],
+    popular: EventData[]
+  }>({
+    upcoming: upcomingEvents,
+    popular: popularEvents
+  });
   
   // Header animation values
   const headerHeight = scrollY.interpolate({
@@ -111,69 +141,137 @@ const EventsScreen: React.FC<EventsScreenProps> = ({ navigation }) => {
     extrapolate: 'clamp'
   });
 
+  // Load data when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      fetchEvents();
+    }, [])
+  );
+
+  // Fetch events from API (mock implementation)
+  const fetchEvents = async () => {
+    setLoading(true);
+    
+    try {
+      // Simulate API request
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // In a real app, these events would come from an API
+      setEvents({
+        upcoming: upcomingEvents,
+        popular: popularEvents
+      });
+    } catch (error) {
+      console.error('Error fetching events:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  // Handle refresh
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchEvents();
+  };
+
+  // Handle event press
+  const handleEventPress = (event: EventData) => {
+    // Apply haptic feedback
+    if (Platform.OS === 'ios') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+
+    // In a full implementation, navigate to an event details screen
+    // For now, show event info in an alert
+    alert(`Event: ${event.title}\n\n${event.description}\n\nOrganized by: ${event.organizer}`);
+  };
+
+  // Handle create event press
+  const handleCreateEvent = () => {
+    // Apply haptic feedback
+    if (Platform.OS === 'ios') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+
+    // In a full implementation, navigate to event creation screen
+    alert('Create Event feature coming soon!');
+  };
+
   // Event Card Component
-  const EventCard: React.FC<EventCardProps> = ({ event, featured = false }) => (
-    <TouchableOpacity
-      style={[
-        styles.eventCard,
-        featured ? styles.featuredEventCard : styles.regularEventCard,
-        { 
-          backgroundColor: colors.card,
-          shadowColor: theme === 'dark' ? '#000' : '#888', 
-        }
-      ]}
-      activeOpacity={0.9}
-      onPress={() => console.log(`Event ${event.id} pressed`)}
+  const EventCard: React.FC<EventCardProps> = ({ event, featured = false, onPress }) => (
+    <MotiView
+      from={{ opacity: 0, translateY: 15 }}
+      animate={{ opacity: 1, translateY: 0 }}
+      transition={{ 
+        type: 'timing', 
+        duration: 500, 
+        delay: featured ? 200 : 300
+      }}
     >
-      <Image 
-        source={{ uri: event.image }} 
+      <TouchableOpacity
         style={[
-          styles.eventImage,
-          featured ? styles.featuredEventImage : styles.regularEventImage
+          styles.eventCard,
+          featured ? styles.featuredEventCard : styles.regularEventCard,
+          { 
+            backgroundColor: colors.card,
+            shadowColor: theme === 'dark' ? '#000' : '#888', 
+            elevation: featured ? 5 : 3
+          }
         ]}
-      />
-      <View style={styles.eventContent}>
-        <Text 
-          variant={featured ? "titleMedium" : "titleSmall"} 
-          color={colors.text} 
-          numberOfLines={2}
-          style={styles.eventTitle}
-        >
-          {event.title}
-        </Text>
-        
-        <View style={styles.eventMeta}>
-          <CalendarIcon size={14} color={colors.textSecondary} />
+        activeOpacity={0.9}
+        onPress={() => onPress(event)}
+      >
+        <Image 
+          source={{ uri: event.image }} 
+          style={[
+            styles.eventImage,
+            featured ? styles.featuredEventImage : styles.regularEventImage
+          ]}
+        />
+        <View style={styles.eventContent}>
           <Text 
-            variant="bodySmall" 
-            color={colors.textSecondary}
-            style={styles.eventMetaText}
+            variant={featured ? "titleMedium" : "titleSmall"} 
+            color={colors.text} 
+            numberOfLines={2}
+            style={styles.eventTitle}
           >
-            {event.date}
+            {event.title}
           </Text>
+          
+          <View style={styles.eventMeta}>
+            <CalendarIcon size={14} color={colors.textSecondary} />
+            <Text 
+              variant="bodySmall" 
+              color={colors.textSecondary}
+              style={styles.eventMetaText}
+            >
+              {event.date}
+            </Text>
+          </View>
+          
+          <View style={styles.eventMeta}>
+            <LocationPinIcon size={14} color={colors.textSecondary} />
+            <Text 
+              variant="bodySmall" 
+              color={colors.textSecondary}
+              style={styles.eventMetaText}
+            >
+              {event.location}
+            </Text>
+          </View>
+          
+          <View style={styles.attendingContainer}>
+            <Text 
+              variant="labelSmall" 
+              color={colors.primary}
+            >
+              {event.attending} attending
+            </Text>
+          </View>
         </View>
-        
-        <View style={styles.eventMeta}>
-          <LocationPinIcon size={14} color={colors.textSecondary} />
-          <Text 
-            variant="bodySmall" 
-            color={colors.textSecondary}
-            style={styles.eventMetaText}
-          >
-            {event.location}
-          </Text>
-        </View>
-        
-        <View style={styles.attendingContainer}>
-          <Text 
-            variant="labelSmall" 
-            color={colors.primary}
-          >
-            {event.attending} attending
-          </Text>
-        </View>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </MotiView>
   );
 
   return (
@@ -215,6 +313,15 @@ const EventsScreen: React.FC<EventsScreenProps> = ({ navigation }) => {
         ]}
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
+            progressViewOffset={moderateScale(210) + insets.top}
+          />
+        }
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
           { useNativeDriver: false }
@@ -238,31 +345,40 @@ const EventsScreen: React.FC<EventsScreenProps> = ({ navigation }) => {
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.featuredContainer}
+            decelerationRate="fast"
+            snapToInterval={moderateScale(280) + SPACING.md}
           >
-            {upcomingEvents.map(event => (
+            {events.upcoming.map(event => (
               <View key={event.id} style={styles.featuredCardWrapper}>
-                <EventCard event={event} featured={true} />
+                <EventCard event={event} featured={true} onPress={handleEventPress} />
               </View>
             ))}
             
             {/* "Create Event" card */}
-            <TouchableOpacity
-              style={[
-                styles.createEventCard,
-                { 
-                  backgroundColor: theme === 'dark' ? colors.backgroundSecondary : colors.backgroundTertiary,
-                  borderColor: `${colors.primary}30`
-                }
-              ]}
-              activeOpacity={0.8}
+            <MotiView
+              from={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ type: 'timing', duration: 500, delay: 400 }}
             >
-              <View style={[styles.createEventIconContainer, { backgroundColor: `${colors.primary}20` }]}>
-                <Text variant="headingLarge" color={colors.primary}>+</Text>
-              </View>
-              <Text variant="labelLarge" color={colors.primary} style={styles.createEventText}>
-                Create Event
-              </Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.createEventCard,
+                  { 
+                    backgroundColor: theme === 'dark' ? colors.backgroundSecondary : colors.backgroundTertiary,
+                    borderColor: `${colors.primary}30`
+                  }
+                ]}
+                activeOpacity={0.8}
+                onPress={handleCreateEvent}
+              >
+                <View style={[styles.createEventIconContainer, { backgroundColor: `${colors.primary}20` }]}>
+                  <Text variant="headingLarge" color={colors.primary}>+</Text>
+                </View>
+                <Text variant="labelLarge" color={colors.primary} style={styles.createEventText}>
+                  Create Event
+                </Text>
+              </TouchableOpacity>
+            </MotiView>
           </ScrollView>
         </View>
         
@@ -281,8 +397,13 @@ const EventsScreen: React.FC<EventsScreenProps> = ({ navigation }) => {
           
           {/* List of regular events */}
           <View style={styles.regularEventsContainer}>
-            {popularEvents.map(event => (
-              <EventCard key={event.id} event={event} featured={false} />
+            {events.popular.map((event, index) => (
+              <EventCard 
+                key={event.id} 
+                event={event} 
+                featured={false} 
+                onPress={handleEventPress} 
+              />
             ))}
           </View>
         </View>
@@ -342,7 +463,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 3,
   },
   featuredEventCard: {
     width: moderateScale(280),

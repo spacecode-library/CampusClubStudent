@@ -146,28 +146,28 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
     ]).start();
   }, []);
   
-  // Validate form
   const validateForm = (): boolean => {
     let isValid = true;
     const newErrors = { email: '', password: '' };
-    
+  
     if (!email.trim()) {
       newErrors.email = 'Email is required';
       isValid = false;
-    } else if (!/\\S+@\\S+\\.\\S+/.test(email)) {
+    } else if (!/\S+@\S+\.\S+/.test(email)) { 
       newErrors.email = 'Email is invalid';
       isValid = false;
     }
-    
-    if (!password) {
+  
+    if (!password.trim()) {  // Added trim() to avoid spaces being valid
       newErrors.password = 'Password is required';
       isValid = false;
     }
-    
-    setErrors(newErrors);
-    
+  
+    setErrors(newErrors);  // ✅ Set errors properly
+  
     return isValid;
   };
+  
   
   // Handle login
   const handleLogin = async () => {
@@ -187,7 +187,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
             // Student is not verified, go to onboarding stack
             showAlert('info', 'Your account needs to be verified.', 'Verification Required', 1500);
             setTimeout(() => {
-              navigation.navigate('OnboardingStack');
+              navigation.navigate('OnboardingWelcome');
             }, 1500);
           } else if (studentStatus.data.status === 'PENDING') {
             // Student is waiting for approval
@@ -206,7 +206,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
           // No student record, go to onboarding
           showAlert('info', 'Please complete the onboarding process.', 'Account Setup', 1500);
           setTimeout(() => {
-            navigation.navigate('OnboardingStack');
+            navigation.navigate('OnboardingVerification');
           }, 1500);
         }
       } else {

@@ -19,10 +19,26 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.kingdipper.CampusClubStudent"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "ffdadcb3-87d0-466c-bc60-56228aced051"
+      }
+    },
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "excludedPackages": ["com.ijzerenhein.sharedelement"]
+          }
+        }
+      ]
+    ]
   }
 }

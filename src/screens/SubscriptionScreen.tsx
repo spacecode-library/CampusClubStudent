@@ -339,11 +339,7 @@ const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ navigation }) =
       
       {/* Hero Background */}
       <View style={styles.heroBackground}>
-        <ImageBackground
-          source={require('../assets/images/subscription-bg.jpg')} // Replace with your image
-          style={styles.heroBgImage}
-          resizeMode="cover"
-        >
+
           <LinearGradient
             colors={[
               'rgba(0, 0, 0, 0.1)',
@@ -351,7 +347,6 @@ const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ navigation }) =
             ]}
             style={styles.heroGradient}
           />
-        </ImageBackground>
       </View>
       
       <ScrollView

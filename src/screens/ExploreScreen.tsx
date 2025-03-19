@@ -15,6 +15,7 @@ import {
   Platform,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { CommonActions } from '@react-navigation/native';
 import { RootStackParamList } from '../../App';
 import { useTheme } from '../context/ThemeContext';
 import Text from '../components/Text';
@@ -269,7 +270,14 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
   
   // Handle discount press
   const handleDiscountPress = (discount: DiscountData) => {
+    // Use type-safe navigation
     navigation.navigate('DiscountDetails', { discountId: discount._id });
+  };
+
+  // Handle merchant press
+  const handleMerchantPress = (merchantId: string) => {
+    // Use type-safe navigation
+    navigation.navigate('MerchantProfile', { merchantId });
   };
   
   // Handle navigate back
@@ -277,7 +285,8 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
     if (searchFocused) {
       clearSearch();
     } else {
-      navigation.goBack();
+      // Use CommonActions for more reliable navigation
+      navigation.dispatch(CommonActions.goBack());
     }
   };
   
@@ -383,6 +392,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
         
         <TouchableOpacity
           style={[styles.viewButton, { backgroundColor: colors.primary }]}
+          onPress={() => handleMerchantPress(item.id)}
         >
           <Text variant="labelMedium" color="#FFFFFF">
             View Offers
@@ -402,7 +412,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
             <Text variant="labelMedium" color={colors.textSecondary}>
               RECENT SEARCHES
             </Text>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={() => setRecentSearches([])}>
               <Text variant="labelSmall" color={colors.primary}>
                 Clear All
               </Text>

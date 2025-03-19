@@ -13,6 +13,7 @@ import {
   Alert
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { CommonActions } from '@react-navigation/native';
 import { RootStackParamList } from '../../App';
 import { useTheme } from '../context/ThemeContext';
 import Text from '../components/Text';
@@ -98,11 +99,13 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
     setLoading(true);
     try {
       await ApiService.logout();
-      // Reset navigation and go to login screen
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Login' }],
-      });
+      // Reset navigation and go to login screen using CommonActions
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: 'Login' }],
+        })
+      );
     } catch (error) {
       console.error('Error logging out:', error);
     } finally {
@@ -124,8 +127,12 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
     Alert.alert('Coming Soon', 'Edit Profile feature will be available in the next update!');
   };
   
-  const handlePreferences = () => {
-    Alert.alert('Coming Soon', 'Preferences feature will be available in the next update!');
+  const handleViewRedemptions = () => {
+    navigation.navigate('RedemptionHistory');
+  };
+  
+  const handleSubscription = () => {
+    navigation.navigate('Subscription');
   };
   
   const handleAbout = () => {
@@ -272,6 +279,57 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
           </View>
         </View>
         
+        {/* Main menu sections */}
+        <View style={styles.menuSection}>
+          <Text variant="titleSmall" color={colors.text} style={styles.sectionTitle}>
+            Your Account
+          </Text>
+          
+          <View 
+            style={[
+              styles.menuCard, 
+              { 
+                backgroundColor: colors.card,
+                shadowColor: theme === 'dark' ? '#000' : '#888',
+              }
+            ]}
+          >
+            <TouchableOpacity 
+              style={[styles.menuItem, { borderBottomColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}
+              onPress={handleViewRedemptions}
+            >
+              <View style={styles.menuItemContent}>
+                <View style={[styles.menuIconContainer, { backgroundColor: `${colors.primary}15` }]}>
+                  <SaleTagIcon size={20} color={colors.primary} />
+                </View>
+                <Text variant="bodyLarge" color={colors.text}>
+                  My Redemptions
+                </Text>
+              </View>
+              <Text variant="labelLarge" color={colors.textTertiary}>
+                &rsaquo;
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.menuItem, { borderBottomColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}
+              onPress={handleSubscription}
+            >
+              <View style={styles.menuItemContent}>
+                <View style={[styles.menuIconContainer, { backgroundColor: `${colors.primary}15` }]}>
+                  <StarIcon size={20} color={colors.primary} />
+                </View>
+                <Text variant="bodyLarge" color={colors.text}>
+                  CampusClub Premium
+                </Text>
+              </View>
+              <View style={[styles.premiumBadge, { backgroundColor: colors.primary }]}>
+                <Text variant="labelSmall" color="#FFFFFF">UPGRADE</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
+        
         {/* Settings sections */}
         <View style={styles.settingsSection}>
           <Text variant="titleSmall" color={colors.text} style={styles.sectionTitle}>
@@ -337,7 +395,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
           </View>
         </View>
         
-        {/* Menu sections */}
+        {/* Help sections */}
         <View style={styles.menuSection}>
           <Text variant="titleSmall" color={colors.text} style={styles.sectionTitle}>
             App
@@ -549,6 +607,11 @@ const styles = StyleSheet.create({
   menuIcon: {
     fontSize: 18,
   },
+  premiumBadge: {
+    paddingHorizontal: SPACING.xs,
+    paddingVertical: 4,
+    borderRadius: BORDER_RADIUS.sm,
+  },
   logoutButton: {
     marginBottom: SPACING.lg,
   },
@@ -559,5 +622,15 @@ const styles = StyleSheet.create({
     height: 100, // Space for bottom navigation
   },
 });
+
+// Add missing components
+const StarIcon = ({ size, color, style }: { size: number, color: string, style?: any }) => {
+  // This is a placeholder - replace with your actual icon component
+  return (
+    <View style={[{ width: size, height: size }, style]}>
+      <Text style={{ color: color, fontSize: size * 0.8 }}>★</Text>
+    </View>
+  );
+};
 
 export default ProfileScreen;

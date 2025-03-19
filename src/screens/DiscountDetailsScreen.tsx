@@ -1,21 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-    View,
-    StyleSheet,
-    TouchableOpacity,
-    StatusBar,
-    ScrollView,
-    Animated,
-    Image,
-    ImageBackground,
-    Share,
-    Clipboard,
-    Linking,
-    Platform,
-    Dimensions,
-  } from 'react-native';
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  StatusBar,
+  ScrollView,
+  Animated,
+  Image,
+  ImageBackground,
+  Share,
+  Alert,
+  Linking,
+  Platform,
+  Dimensions,
+} from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { RouteProp } from '@react-navigation/native';
+import { RouteProp, CommonActions } from '@react-navigation/native';
 import { RootStackParamList } from '../../App';
 import { useTheme } from '../context/ThemeContext';
 import Text from '../components/Text';
@@ -37,13 +37,6 @@ import {
   ShareIcon, 
   CalendarIcon, 
   LocationPinIcon, 
-  SaleTagIcon,
-  CheckIcon,
-  ClipboardIcon,
-  InfoIcon,
-  AlertCircleIcon,
-  CheckCircleIcon,
-  ExternalLinkIcon,
   TagIcon,
 } from '../components/icons';
 
@@ -55,9 +48,10 @@ interface DiscountDetailsScreenProps {
   route: DiscountDetailsScreenRouteProp;
 }
 
+// Create a custom type that extends React.FC with a sharedElements property
 interface SharedElementScreenComponent<P = {}> extends React.FC<P> {
-    sharedElements?: (props: any) => string[];
-  }
+  sharedElements?: (props: any) => string[];
+}
 
 // Example mock discount for preview
 const mockDiscount: DiscountData = {
@@ -137,21 +131,31 @@ const DiscountDetailsScreen: SharedElementScreenComponent<DiscountDetailsScreenP
       try {
         setLoading(true);
         
-        // In a real app, fetch from API using route.params.discountId
-        // const response = await ApiService.getDiscountById(route.params.discountId);
+        if (!route.params?.discountId) {
+          throw new Error('Discount ID is required');
+        }
+
+        // Try to fetch from API using route.params.discountId
+        const response = await ApiService.getDiscountById(route.params.discountId);
         
-        // For this demo, we'll just use the mock data with simulated delay
-        await new Promise(resolve => setTimeout(resolve, 500));
-        setDiscount(mockDiscount);
+        if (response.success && response.data) {
+          setDiscount(response.data);
+        } else {
+          // If API call fails, use mock data with simulated delay for demo
+          await new Promise(resolve => setTimeout(resolve, 500));
+          setDiscount(mockDiscount);
+        }
       } catch (error) {
         console.error('Error fetching discount details:', error);
+        // Fallback to mock data
+        setDiscount(mockDiscount);
       } finally {
         setLoading(false);
       }
     };
     
     fetchDiscountData();
-  }, []);
+  }, [route.params?.discountId]);
   
   // Format end date
   const formatEndDate = (dateString: string | Date) => {
@@ -174,7 +178,7 @@ const DiscountDetailsScreen: SharedElementScreenComponent<DiscountDetailsScreenP
 
   // Handle back button press
   const handleBackPress = () => {
-    navigation.goBack();
+    navigation.dispatch(CommonActions.goBack());
   };
 
   // Handle share button press
@@ -189,11 +193,21 @@ const DiscountDetailsScreen: SharedElementScreenComponent<DiscountDetailsScreenP
       await Share.share({
         title: `${discount.title} - ${discount.discountpercentage}% off`,
         message: `Check out this discount on CampusClub: ${discount.title} - ${discount.discountpercentage}% off at ${discount.merchantName}!`,
-        // url: 'https://campusclub.app/discount/' + discount._id // In a real app
       });
     } catch (error) {
       console.log('Error sharing:', error);
     }
+  };
+
+  // Handle merchant profile
+  const handleViewMerchant = () => {
+    if (!discount) return;
+    
+    if (Platform.OS === 'ios') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    
+    navigation.navigate('MerchantProfile', { merchantId: discount.merchantId });
   };
 
   // Handle redeem button press
@@ -207,67 +221,65 @@ const DiscountDetailsScreen: SharedElementScreenComponent<DiscountDetailsScreenP
     setRedeemLoading(true);
     
     try {
-      // In a real app, call API to redeem
-      // const response = await ApiService.redeemDiscount(discount._id);
+      // Try to call the API in a real app
+      const response = await ApiService.redeemDiscount(discount._id);
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Generate a random code for demo
-      const code = 'CC' + Math.floor(1000000 + Math.random() * 9000000).toString();
-      setRedeemCode(code);
-      setIsRedeemed(true);
-      
-      // Play success animation
-      if (successAnimationRef.current) {
-        successAnimationRef.current.play();
-      }
-      
-      // If online discount, open store link
-      if (discount.discountType === 'ONLINE' && discount.storeLink) {
-        setTimeout(() => {
-          Linking.openURL(discount.storeLink!);
-        }, 1000);
+      // If API call fails, simulate for demo purposes
+      if (!response.success) {
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        // Generate a random code for demo
+        const code = 'CC' + Math.floor(1000000 + Math.random() * 9000000).toString();
+        setRedeemCode(code);
+        setIsRedeemed(true);
+        
+        if (successAnimationRef.current) {
+          successAnimationRef.current.play();
+        }
+        
+        navigation.navigate('RedemptionSuccess', {
+          redemptionId: `demo-${Date.now()}`,
+          discountTitle: discount.title,
+          discountPercentage: discount.discountpercentage,
+          merchantName: discount.merchantName,
+          merchantLogo: discount.merchantLogo,
+          redemptionCode: code,
+          isOnline: discount.discountType === 'ONLINE',
+          storeLink: discount.storeLink,
+          expirationDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+        });
+      } else if (response.data && response.data.redeemCode) {
+        setRedeemCode(response.data.redeemCode);
+        setIsRedeemed(true);
+        
+        navigation.navigate('RedemptionSuccess', {
+          redemptionId: `api-${Date.now()}`,
+          discountTitle: discount.title,
+          discountPercentage: discount.discountpercentage,
+          merchantName: discount.merchantName,
+          merchantLogo: discount.merchantLogo,
+          redemptionCode: response.data.redeemCode,
+          isOnline: discount.discountType === 'ONLINE',
+          storeLink: discount.storeLink,
+          expirationDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+        });
       }
     } catch (error) {
       console.error('Error redeeming discount:', error);
+      Alert.alert('Redemption Failed', 'An error occurred while redeeming this discount. Please try again later.');
     } finally {
       setRedeemLoading(false);
     }
   };
   
-  // Handle copy code to clipboard
-  const handleCopyCode = () => {
-    if (redeemCode) {
-      Clipboard.setString(redeemCode);
-      
-      if (Platform.OS === 'ios') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
-      
-      // Show toast or some kind of feedback here
-    }
-  };
-  
-  // Check if discount is online or offline
   const isOnline = discount?.discountType === 'ONLINE';
   
-  // Render loading placeholder
   if (loading || !discount) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
-        <StatusBar
-          barStyle="light-content"
-          backgroundColor="transparent"
-          translucent
-        />
+        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
         <View style={styles.loadingContent}>
-          <View 
-            style={[
-              styles.loadingPlaceholder, 
-              { backgroundColor: theme === 'dark' ? '#2A2A40' : '#EFEFEF' }
-            ]} 
-          />
+          <View style={[styles.loadingPlaceholder, { backgroundColor: theme === 'dark' ? '#2A2A40' : '#EFEFEF' }]} />
         </View>
       </View>
     );
@@ -275,49 +287,28 @@ const DiscountDetailsScreen: SharedElementScreenComponent<DiscountDetailsScreenP
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor="transparent"
-        translucent
-      />
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       
       {/* Animated header */}
       <Animated.View 
         style={[
           styles.animatedHeader,
-          {
-            backgroundColor: colors.background,
-            opacity: headerOpacity,
-            height: insets.top + 60,
-            paddingTop: insets.top,
-          }
+          { backgroundColor: colors.background, opacity: headerOpacity, height: insets.top + 60, paddingTop: insets.top }
         ]}
       >
         <View style={styles.headerContent}>
-          <TouchableOpacity 
-            style={styles.backButton} 
-            onPress={handleBackPress}
-          >
+          <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
             <ArrowLeftIcon size={24} color={colors.text} />
           </TouchableOpacity>
           
           <Animated.Text
-            style={[
-              styles.headerTitle,
-              {
-                color: colors.text,
-                opacity: headerTitleOpacity,
-              }
-            ]}
+            style={[styles.headerTitle, { color: colors.text, opacity: headerTitleOpacity }]}
             numberOfLines={1}
           >
             {discount.title}
           </Animated.Text>
           
-          <TouchableOpacity 
-            style={styles.shareButton}
-            onPress={handleSharePress}
-          >
+          <TouchableOpacity style={styles.shareButton} onPress={handleSharePress}>
             <ShareIcon size={22} color={colors.text} />
           </TouchableOpacity>
         </View>
@@ -328,52 +319,23 @@ const DiscountDetailsScreen: SharedElementScreenComponent<DiscountDetailsScreenP
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: false }
-        )}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: false })}
       >
         {/* Hero Image Section */}
         <SharedElement id={`discount.${discount._id}.card`}>
-          <Animated.View 
-            style={[
-              styles.heroContainer,
-              {
-                transform: [{ scale: heroScale }],
-                opacity: heroOpacity,
-              }
-            ]}
-          >
-            <ImageBackground
-              source={{ uri: discount.backgroundImage }}
-              style={[
-                styles.heroImage,
-                { height: SCREEN_HEIGHT * 0.45 }
-              ]}
-            >
-              <LinearGradient
-                colors={['rgba(0,0,0,0.2)', 'rgba(0,0,0,0.7)']}
-                style={styles.heroGradient}
-              >
+          <Animated.View style={[styles.heroContainer, { transform: [{ scale: heroScale }], opacity: heroOpacity }]}>
+            <ImageBackground source={{ uri: discount.backgroundImage }} style={[styles.heroImage, { height: SCREEN_HEIGHT * 0.45 }]}>
+              <LinearGradient colors={['rgba(0,0,0,0.2)', 'rgba(0,0,0,0.7)']} style={styles.heroGradient}>
                 <View style={[styles.heroOverlay, { paddingTop: insets.top + 10 }]}>
-                  {/* Top Action Buttons */}
                   <View style={styles.heroActions}>
-                    <TouchableOpacity
-                      style={[styles.heroButton, { backgroundColor: 'rgba(0,0,0,0.3)' }]}
-                      onPress={handleBackPress}
-                    >
+                    <TouchableOpacity style={[styles.heroButton, { backgroundColor: 'rgba(0,0,0,0.3)' }]} onPress={handleBackPress}>
                       <ArrowLeftIcon size={20} color="#FFFFFF" />
                     </TouchableOpacity>
-                    
-                    <TouchableOpacity
-                      style={[styles.heroButton, { backgroundColor: 'rgba(0,0,0,0.3)' }]}
-                      onPress={handleSharePress}
-                    >
+                    <TouchableOpacity style={[styles.heroButton, { backgroundColor: 'rgba(0,0,0,0.3)' }]} onPress={handleSharePress}>
                       <ShareIcon size={20} color="#FFFFFF" />
                     </TouchableOpacity>
                   </View>
                   
-                  {/* Discount Badge */}
                   <View style={styles.discountBadgeContainer}>
                     <MotiView
                       style={[styles.discountBadge, { backgroundColor: colors.primary }]}
@@ -390,15 +352,13 @@ const DiscountDetailsScreen: SharedElementScreenComponent<DiscountDetailsScreenP
                     </MotiView>
                   </View>
                   
-                  {/* Merchant Logo */}
                   {discount.merchantLogo && (
-                    <Image 
-                      source={{ uri: discount.merchantLogo }} 
-                      style={[
-                        styles.merchantLogo,
-                        { borderColor: 'rgba(255,255,255,0.2)' }
-                      ]} 
-                    />
+                    <TouchableOpacity onPress={handleViewMerchant} activeOpacity={0.9}>
+                      <Image 
+                        source={{ uri: discount.merchantLogo }} 
+                        style={[styles.merchantLogo, { borderColor: 'rgba(255,255,255,0.2)' }]} 
+                      />
+                    </TouchableOpacity>
                   )}
                 </View>
               </LinearGradient>
@@ -408,82 +368,46 @@ const DiscountDetailsScreen: SharedElementScreenComponent<DiscountDetailsScreenP
         
         {/* Content Section */}
         <MotiView
-          style={[
-            styles.contentContainer,
-            { backgroundColor: colors.background }
-          ]}
+          style={[styles.contentContainer, { backgroundColor: colors.background }]}
           from={{ opacity: 0, translateY: 40 }}
           animate={{ opacity: 1, translateY: 0 }}
           transition={{ type: 'timing', duration: 700, delay: 200 }}
         >
-          {/* Title & Info */}
           <View style={styles.titleSection}>
-            <Text 
-              variant="headingMedium" 
-              color={colors.text}
-              style={styles.title}
-            >
+            <Text variant="headingMedium" color={colors.text} style={styles.title}>
               {discount.title}
             </Text>
-            
-            <Text 
-              variant="bodyMedium" 
-              color={colors.textSecondary}
-              style={styles.merchantName}
-            >
-              {discount.merchantName}
-            </Text>
-            
-            {/* Meta Info: Location & Type */}
+            <TouchableOpacity style={styles.merchantButton} onPress={handleViewMerchant}>
+              <Text variant="bodyMedium" color={colors.textSecondary} style={styles.merchantName}>
+                {discount.merchantName}
+              </Text>
+            </TouchableOpacity>
             <View style={styles.metaContainer}>
               <View style={styles.metaItem}>
                 <LocationPinIcon size={16} color={colors.textSecondary} />
-                <Text 
-                  variant="bodySmall" 
-                  color={colors.textSecondary}
-                  style={styles.metaText}
-                >
+                <Text variant="bodySmall" color={colors.textSecondary} style={styles.metaText}>
                   {isOnline ? 'Online' : `${discount.merchantCity}, ${discount.merchantCountry}`}
                 </Text>
               </View>
-              
-              <View style={[
-                styles.discountType,
-                { 
-                  backgroundColor: isOnline 
-                    ? `${colors.info}15` 
-                    : `${colors.success}15` 
-                }
-              ]}>
-                <Text 
-                  variant="labelSmall" 
-                  color={isOnline ? colors.info : colors.success}
-                >
+              <View style={[styles.discountType, { backgroundColor: isOnline ? `${colors.info}15` : `${colors.success}15` }]}>
+                <Text variant="labelSmall" color={isOnline ? colors.info : colors.success}>
                   {isOnline ? 'Online' : 'In-Store'}
                 </Text>
               </View>
             </View>
           </View>
           
-          {/* Expiration Info */}
           <MotiView
             style={[
               styles.expirationCard,
-              { 
-                backgroundColor: theme === 'dark' 
-                  ? 'rgba(255, 255, 255, 0.05)' 
-                  : 'rgba(0, 0, 0, 0.03)' 
-              }
+              { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)' }
             ]}
             from={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ type: 'timing', duration: 700, delay: 400 }}
           >
             <View style={styles.expirationHeader}>
-              <Text 
-                variant="labelLarge" 
-                color={colors.text}
-              >
+              <Text variant="labelLarge" color={colors.text}>
                 Expires In
               </Text>
               <View style={[
@@ -496,15 +420,13 @@ const DiscountDetailsScreen: SharedElementScreenComponent<DiscountDetailsScreenP
                       : `${colors.error}15`
                 }
               ]}>
-                <Text 
-                  variant="labelSmall" 
-                  color={getDaysRemaining(discount.endDate) > 30 
+                <Text variant="labelSmall" color={
+                  getDaysRemaining(discount.endDate) > 30 
                     ? colors.success 
                     : getDaysRemaining(discount.endDate) > 7 
                       ? colors.warning 
                       : colors.error
-                  }
-                >
+                }>
                   {getDaysRemaining(discount.endDate)} days
                 </Text>
               </View>
@@ -512,54 +434,35 @@ const DiscountDetailsScreen: SharedElementScreenComponent<DiscountDetailsScreenP
             
             <View style={styles.expirationDetails}>
               <CalendarIcon size={16} color={colors.textSecondary} />
-              <Text 
-                variant="bodySmall" 
-                color={colors.textSecondary}
-                style={styles.expirationDate}
-              >
+              <Text variant="bodySmall" color={colors.textSecondary} style={styles.expirationDate}>
                 {formatEndDate(discount.endDate)}
               </Text>
             </View>
           </MotiView>
           
-          {/* Description */}
           <MotiView
             style={styles.descriptionSection}
             from={{ opacity: 0, translateY: 20 }}
             animate={{ opacity: 1, translateY: 0 }}
             transition={{ type: 'timing', duration: 700, delay: 500 }}
           >
-            <Text 
-              variant="titleSmall" 
-              color={colors.text}
-              style={styles.sectionTitle}
-            >
+            <Text variant="titleSmall" color={colors.text} style={styles.sectionTitle}>
               Details
             </Text>
-            <Text 
-              variant="bodyMedium" 
-              color={colors.textSecondary}
-              style={styles.description}
-            >
+            <Text variant="bodyMedium" color={colors.textSecondary} style={styles.description}>
               {discount.description}
             </Text>
           </MotiView>
           
-          {/* Redemption Instructions */}
           <MotiView
             style={styles.redeemSection}
             from={{ opacity: 0, translateY: 20 }}
             animate={{ opacity: 1, translateY: 0 }}
             transition={{ type: 'timing', duration: 700, delay: 600 }}
           >
-            <Text 
-              variant="titleSmall" 
-              color={colors.text}
-              style={styles.sectionTitle}
-            >
+            <Text variant="titleSmall" color={colors.text} style={styles.sectionTitle}>
               How to Redeem
             </Text>
-            
             <View style={styles.redeemSteps}>
               {isOnline ? (
                 <>
@@ -571,7 +474,6 @@ const DiscountDetailsScreen: SharedElementScreenComponent<DiscountDetailsScreenP
                       Click the "Redeem Now" button below
                     </Text>
                   </View>
-                  
                   <View style={styles.redeemStep}>
                     <View style={[styles.stepNumber, { backgroundColor: colors.primary }]}>
                       <Text variant="labelMedium" color="#FFFFFF">2</Text>
@@ -580,7 +482,6 @@ const DiscountDetailsScreen: SharedElementScreenComponent<DiscountDetailsScreenP
                       Copy your discount code that appears
                     </Text>
                   </View>
-                  
                   <View style={styles.redeemStep}>
                     <View style={[styles.stepNumber, { backgroundColor: colors.primary }]}>
                       <Text variant="labelMedium" color="#FFFFFF">3</Text>
@@ -589,7 +490,6 @@ const DiscountDetailsScreen: SharedElementScreenComponent<DiscountDetailsScreenP
                       You'll be directed to the merchant's website
                     </Text>
                   </View>
-                  
                   <View style={styles.redeemStep}>
                     <View style={[styles.stepNumber, { backgroundColor: colors.primary }]}>
                       <Text variant="labelMedium" color="#FFFFFF">4</Text>
@@ -609,7 +509,6 @@ const DiscountDetailsScreen: SharedElementScreenComponent<DiscountDetailsScreenP
                       Click "Redeem Now" to generate your unique discount code
                     </Text>
                   </View>
-                  
                   <View style={styles.redeemStep}>
                     <View style={[styles.stepNumber, { backgroundColor: colors.primary }]}>
                       <Text variant="labelMedium" color="#FFFFFF">2</Text>
@@ -618,7 +517,6 @@ const DiscountDetailsScreen: SharedElementScreenComponent<DiscountDetailsScreenP
                       Show this screen with your code to the cashier
                     </Text>
                   </View>
-                  
                   <View style={styles.redeemStep}>
                     <View style={[styles.stepNumber, { backgroundColor: colors.primary }]}>
                       <Text variant="labelMedium" color="#FFFFFF">3</Text>
@@ -632,30 +530,20 @@ const DiscountDetailsScreen: SharedElementScreenComponent<DiscountDetailsScreenP
             </View>
           </MotiView>
           
-          {/* Terms and Conditions */}
           <MotiView
             style={styles.termsSection}
             from={{ opacity: 0, translateY: 20 }}
             animate={{ opacity: 1, translateY: 0 }}
             transition={{ type: 'timing', duration: 700, delay: 700 }}
           >
-            <Text 
-              variant="titleSmall" 
-              color={colors.text}
-              style={styles.sectionTitle}
-            >
+            <Text variant="titleSmall" color={colors.text} style={styles.sectionTitle}>
               Terms & Conditions
             </Text>
-            
             <View style={styles.termsContainer}>
               {termsAndConditions.map((term, index) => (
                 <View key={index} style={styles.termItem}>
                   <View style={[styles.termBullet, { backgroundColor: colors.primary }]} />
-                  <Text 
-                    variant="bodySmall" 
-                    color={colors.textSecondary}
-                    style={styles.termText}
-                  >
+                  <Text variant="bodySmall" color={colors.textSecondary} style={styles.termText}>
                     {term}
                   </Text>
                 </View>
@@ -663,12 +551,10 @@ const DiscountDetailsScreen: SharedElementScreenComponent<DiscountDetailsScreenP
             </View>
           </MotiView>
           
-          {/* Bottom space for CTA */}
           <View style={{ height: 120 }} />
         </MotiView>
       </Animated.ScrollView>
       
-      {/* Bottom CTA */}
       <View 
         style={[
           styles.ctaContainer,
@@ -679,98 +565,15 @@ const DiscountDetailsScreen: SharedElementScreenComponent<DiscountDetailsScreenP
           }
         ]}
       >
-        {isRedeemed ? (
-          // Redeemed state with code
-          <MotiView 
-            style={styles.redeemedContainer}
-            from={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ type: 'spring', damping: 15 }}
-          >
-            <View style={styles.codeContainer}>
-              <View style={styles.successIconContainer}>
-                <LottieView
-                  ref={successAnimationRef}
-                  source={require('../assets/animations/success-check.json')}
-                  style={styles.successAnimation}
-                  autoPlay={false}
-                  loop={false}
-                />
-              </View>
-              
-              <Text 
-                variant="labelLarge" 
-                color={colors.success} 
-                style={styles.redeemedText}
-              >
-                Successfully Redeemed!
-              </Text>
-              
-              <View 
-                style={[
-                  styles.codeBox, 
-                  { 
-                    backgroundColor: theme === 'dark' 
-                      ? 'rgba(255, 255, 255, 0.05)' 
-                      : 'rgba(0, 0, 0, 0.03)' 
-                  }
-                ]}
-              >
-                <Text 
-                  variant="headingMedium" 
-                  color={colors.text}
-                  style={styles.codeText}
-                >
-                  {redeemCode}
-                </Text>
-                
-                <TouchableOpacity 
-                  style={[
-                    styles.copyButton, 
-                    { backgroundColor: `${colors.primary}15` }
-                  ]}
-                  onPress={handleCopyCode}
-                >
-                  <ClipboardIcon size={18} color={colors.primary} />
-                  <Text 
-                    variant="labelSmall" 
-                    color={colors.primary}
-                    style={styles.copyText}
-                  >
-                    Copy
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              
-              {isOnline && (
-                <TouchableOpacity 
-                  style={styles.visitButton}
-                  onPress={() => discount.storeLink && Linking.openURL(discount.storeLink)}
-                >
-                  <ExternalLinkIcon size={16} color={colors.primary} />
-                  <Text 
-                    variant="labelMedium" 
-                    color={colors.primary}
-                    style={{ marginLeft: 6 }}
-                  >
-                    Visit Merchant Website
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          </MotiView>
-        ) : (
-          // Not redeemed state
-          <Button
-            title={isOnline ? "Redeem Online" : "Redeem In Store"}
-            onPress={handleRedeemPress}
-            loading={redeemLoading}
-            fullWidth
-            style={styles.redeemButton}
-            icon={<TagIcon size={18} color="white" />}
-            iconPosition="left"
-          />
-        )}
+        <Button
+          title={isOnline ? "Redeem Online" : "Redeem In Store"}
+          onPress={handleRedeemPress}
+          loading={redeemLoading}
+          fullWidth
+          style={styles.redeemButton}
+          icon={<TagIcon size={18} color="white" />}
+          iconPosition="left"
+        />
       </View>
     </View>
   );
@@ -887,9 +690,11 @@ const styles = StyleSheet.create({
   title: {
     marginBottom: 4,
   },
-  merchantName: {
+  merchantButton: {
+    alignSelf: 'flex-start',
     marginBottom: SPACING.sm,
   },
+  merchantName: {},
   metaContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -966,9 +771,7 @@ const styles = StyleSheet.create({
   termsSection: {
     marginBottom: SPACING.lg,
   },
-  termsContainer: {
-    
-  },
+  termsContainer: {},
   termItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -997,58 +800,11 @@ const styles = StyleSheet.create({
   redeemButton: {
     height: moderateScale(54),
   },
-  redeemedContainer: {
-    width: '100%',
-  },
-  codeContainer: {
-    alignItems: 'center',
-  },
-  successIconContainer: {
-    width: moderateScale(60),
-    height: moderateScale(60),
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: SPACING.xs,
-  },
-  successAnimation: {
-    width: moderateScale(100),
-    height: moderateScale(100),
-  },
-  redeemedText: {
-    marginBottom: SPACING.sm,
-  },
-  codeBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-    padding: SPACING.md,
-    borderRadius: BORDER_RADIUS.md,
-  },
-  codeText: {
-    letterSpacing: 1,
-  },
-  copyButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.xs,
-    borderRadius: BORDER_RADIUS.sm,
-  },
-  copyText: {
-    marginLeft: 4,
-  },
-  visitButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: SPACING.md,
-  },
 });
 
-// Required for shared element transitions
-DiscountDetailsScreen.sharedElements = (route) => {
-    const { discountId } = route.params;
-    return [`discount.${discountId}.card`];
-  };
+DiscountDetailsScreen.sharedElements = ({ route, otherRoute, showing }: any) => {
+  const { discountId } = route.params;
+  return [`discount.${discountId}.card`];
+};
 
 export default DiscountDetailsScreen;

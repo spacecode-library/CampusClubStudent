@@ -18,6 +18,10 @@ import EventsScreen from './src/screens/EventsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import DiscountDetailsScreen from './src/screens/DiscountDetailsScreen';
 import SubscriptionScreen from './src/screens/SubscriptionScreen';
+import MerchantProfileScreen from './src/screens/MerchantProfileScreen';
+import RedemptionSuccessScreen from './src/screens/RedemptionSuccessScreen';
+import ActiveRedemptionsScreen from './src/screens/ActiveRedemptionsScreen';
+import RedemptionHistoryScreen from './src/screens/RedemptionHistoryScreen';
 
 // Components
 import FloatingTabBar from './src/components/FloatingTabBar';
@@ -29,18 +33,17 @@ import ApiService from './src/services/ApiService';
 // Theme context
 import { ThemeProvider } from './src/context/ThemeContext';
 
-// Icons
+// Icons for Tab Navigation
 import { 
   HomeIcon, 
   ExploreIcon, 
   EventIcon, 
   ProfileIcon 
 } from './src/components/NavigationIcons';
-import MerchantProfileScreen from './src/screens/MerchantProfileScreen';
-import RedemptionSuccessScreen from './src/screens/RedemptionSuccessScreen';
-import ActiveRedemptionsScreen from './src/screens/ActiveRedemptionsScreen';
-import RedemptionHistoryScreen from './src/screens/RedemptionHistoryScreen';
 
+//
+// Types for Navigation
+//
 
 export interface RedemptionSuccessParams {
   redemptionId: string;
@@ -54,72 +57,53 @@ export interface RedemptionSuccessParams {
   expirationDate?: string;
 }
 
+// Fix for navigation type issues
 export type RootStackParamList = {
-  AuthStack: undefined;
-  OnboardingStack: undefined;
-  MainTabs: undefined;
+  // Authentication Screens
   Login: undefined;
   SignUp: undefined;
+  // Onboarding Screens
   OnboardingWelcome: undefined;
   OnboardingVerification: undefined;
   OnboardingDocument: undefined;
   VerificationStatus: undefined;
+  // Main App Screens
+  MainTabs: undefined; // This screen renders the Tab Navigator
+  DiscountDetails: { discountId: string };
+  Subscription: undefined;
+  MerchantProfile: { merchantId: string };
+  RedemptionSuccess: RedemptionSuccessParams;
+  ActiveRedemptions: { redemptionId: string };
+  RedemptionHistory: undefined;
+  // Individual tab screens (needed for type safety)
   Home: undefined;
   Explore: undefined;
   Events: undefined;
   Profile: undefined;
-  DiscountDetails: { discountId: string };
-  Subscription: undefined;
-  ActiveRedemptions: { redemptionId: string };
-  RedemptionHistory: undefined;
-  // Add these missing routes:
-  MerchantProfile: { merchantId: string };
-  RedemptionSuccess: RedemptionSuccessParams;
 };
 
+// Define a separate TabParamList for bottom tabs
+export type TabParamList = {
+  Home: undefined;
+  Explore: undefined;
+  Events: undefined;
+  Profile: undefined;
+};
 
-// Create navigation stacks
-const Stack = createStackNavigator<RootStackParamList>();
-const Tab = createBottomTabNavigator<RootStackParamList>();
-const AuthStack = createStackNavigator<RootStackParamList>();
-const OnboardingStack = createStackNavigator<RootStackParamList>();
+//
+// Create Navigators
+//
 
-// Auth stack navigator
-const AuthStackNavigator = () => (
-  <AuthStack.Navigator 
-    screenOptions={{ 
-      headerShown: false,
-      gestureEnabled: false
-    }}
-  >
-    <AuthStack.Screen name="Login" component={LoginScreen} />
-    <AuthStack.Screen name="SignUp" component={SignUpScreen} />
-  </AuthStack.Navigator>
-);
+// Create a Bottom Tab Navigator for the main app screens.
+const Tab = createBottomTabNavigator<TabParamList>();
 
-// Onboarding stack navigator
-const OnboardingStackNavigator = () => (
-  <OnboardingStack.Navigator 
-    screenOptions={{ 
-      headerShown: false,
-      gestureEnabled: false
-    }}
-  >
-    <OnboardingStack.Screen name="OnboardingWelcome" component={OnboardingWelcomeScreen} />
-    <OnboardingStack.Screen name="OnboardingVerification" component={OnboardingVerificationScreen} />
-    <OnboardingStack.Screen name="OnboardingDocument" component={OnboardingDocumentScreen} />
-    <OnboardingStack.Screen name="VerificationStatus" component={VerificationStatusScreen} />
-  </OnboardingStack.Navigator>
-);
-
-// Main tab navigator
 const MainTabNavigator = () => (
   <Tab.Navigator
     screenOptions={{
       headerShown: false,
       tabBarShowLabel: false,
     }}
-    tabBar={props => <FloatingTabBar {...props} />}
+    tabBar={(props) => <FloatingTabBar {...props} />}
   >
     <Tab.Screen 
       name="Home" 
@@ -127,7 +111,7 @@ const MainTabNavigator = () => (
       options={{
         tabBarIcon: ({ color, size, focused }) => (
           <HomeIcon color={color} size={size} filled={focused} />
-        )
+        ),
       }}
     />
     <Tab.Screen 
@@ -136,7 +120,7 @@ const MainTabNavigator = () => (
       options={{
         tabBarIcon: ({ color, size, focused }) => (
           <ExploreIcon color={color} size={size} filled={focused} />
-        )
+        ),
       }}
     />
     <Tab.Screen 
@@ -145,7 +129,7 @@ const MainTabNavigator = () => (
       options={{
         tabBarIcon: ({ color, size, focused }) => (
           <EventIcon color={color} size={size} filled={focused} />
-        )
+        ),
       }}
     />
     <Tab.Screen 
@@ -154,40 +138,44 @@ const MainTabNavigator = () => (
       options={{
         tabBarIcon: ({ color, size, focused }) => (
           <ProfileIcon color={color} size={size} filled={focused} />
-        )
+        ),
       }}
     />
   </Tab.Navigator>
 );
 
+// Create the Root Stack Navigator
+const Stack = createStackNavigator<RootStackParamList>();
+
+//
+// App Component
+//
+
 const App = () => {
+  // Local state to hold authentication and onboarding status.
   const [isLoading, setIsLoading] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isOnboardingCompleted, setIsOnboardingCompleted] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
 
   useEffect(() => {
-    // Check authentication status
+    // Check authentication status and user onboarding status
     const checkAuth = async () => {
       try {
         const isUserLoggedIn = await ApiService.isLoggedIn();
         setIsLoggedIn(isUserLoggedIn);
 
         if (isUserLoggedIn) {
-          // Check if user has completed onboarding
           const studentStatus = await ApiService.getStudentStatus();
-          
           if (studentStatus.success && studentStatus.data) {
-            // User has started onboarding
+            // User has started onboarding.
             setIsOnboardingCompleted(true);
-            
-            // Check if user is verified
+            // Set verified flag if the user is verified.
             setIsVerified(
               studentStatus.data.isVerified && 
               studentStatus.data.status === 'VERIFIED'
             );
           } else {
-            // User has not started onboarding
             setIsOnboardingCompleted(false);
             setIsVerified(false);
           }
@@ -206,59 +194,52 @@ const App = () => {
     return <LoadingScreen />;
   }
 
+  // Choose initial route based on the authentication and onboarding status.
+  let initialRoute: keyof RootStackParamList = 'Login';
+  if (isLoggedIn) {
+    if (!isOnboardingCompleted) {
+      initialRoute = 'OnboardingWelcome';
+    } else if (!isVerified) {
+      initialRoute = 'VerificationStatus';
+    } else {
+      initialRoute = 'MainTabs';
+    }
+  }
+
   return (
     <ThemeProvider>
       <NavigationContainer>
         <Stack.Navigator
+          initialRouteName={initialRoute}
           screenOptions={{
             headerShown: false,
-            gestureEnabled: false
+            gestureEnabled: false,
           }}
         >
-          {!isLoggedIn ? (
-            // Not logged in - show auth flow
-            <Stack.Screen name="MainTabs" component={MainTabNavigator} />
-            ) : !isOnboardingCompleted ? (
-            // Logged in but onboarding not completed
-            <Stack.Screen name="OnboardingStack" component={OnboardingStackNavigator} />
-          ) : !isVerified ? (
-            // Onboarding completed but not verified
-            <Stack.Screen 
-              name="VerificationStatus" 
-              component={VerificationStatusScreen}
-              options={{ gestureEnabled: false }}
-            />
-          ) : (
-            // Fully verified user
-            <>
-              <Stack.Screen name="MainTabs" component={MainTabNavigator} />
-              <Stack.Screen 
-                name="DiscountDetails" 
-                component={DiscountDetailsScreen}
-                options={{ gestureEnabled: true }}
-              />
-              <Stack.Screen 
-                name="MerchantProfile"
-                component={MerchantProfileScreen}
-                options={{ gestureEnabled: true }}
-              />
-              <Stack.Screen 
-                name="RedemptionSuccess"
-                component={RedemptionSuccessScreen}
-                options={{ gestureEnabled: false }}
-              />
-              <Stack.Screen 
-                name="ActiveRedemptions"
-                component={ActiveRedemptionsScreen}
-                options={{ gestureEnabled: true }}
-              />
-              <Stack.Screen 
-                name="RedemptionHistory"
-                component={RedemptionHistoryScreen}
-                options={{ gestureEnabled: true }}
-              />
-            </>
-          )}
+          {/* Authentication Screens */}
+          <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="SignUp" component={SignUpScreen} />
+
+          {/* Onboarding Screens */}
+          <Stack.Screen name="OnboardingWelcome" component={OnboardingWelcomeScreen} />
+          <Stack.Screen name="OnboardingVerification" component={OnboardingVerificationScreen} />
+          <Stack.Screen name="OnboardingDocument" component={OnboardingDocumentScreen} />
+          <Stack.Screen name="VerificationStatus" component={VerificationStatusScreen} />
+
+          {/* Main Application */}
+          <Stack.Screen name="MainTabs" component={MainTabNavigator} />
+          <Stack.Screen name="DiscountDetails" component={DiscountDetailsScreen} />
+          <Stack.Screen name="Subscription" component={SubscriptionScreen} />
+          <Stack.Screen name="MerchantProfile" component={MerchantProfileScreen} />
+          <Stack.Screen name="RedemptionSuccess" component={RedemptionSuccessScreen} />
+          <Stack.Screen name="ActiveRedemptions" component={ActiveRedemptionsScreen} />
+          <Stack.Screen name="RedemptionHistory" component={RedemptionHistoryScreen} />
+
+          {/* Individual tab screens (needed for type access but not used in navigation) */}
+          <Stack.Screen name="Home" component={HomeScreen} />
+          <Stack.Screen name="Explore" component={ExploreScreen} />
+          <Stack.Screen name="Events" component={EventsScreen} />
+          <Stack.Screen name="Profile" component={ProfileScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </ThemeProvider>
