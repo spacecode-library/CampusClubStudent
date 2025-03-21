@@ -7,10 +7,10 @@ import {
   ViewStyle,
   TextStyle,
 } from 'react-native';
-import { useTheme } from '../../context/ThemeContext';
-import { BORDER_RADIUS, SPACING } from '../../constants/globalStyles';
-import { FONTS, FONT_SIZE, FONT_WEIGHT } from '../../constants/typography';
-import { CheckIcon } from '../icons';
+import { useTheme } from '../context/ThemeContext';
+import { BORDER_RADIUS, SPACING } from '../constants/globalStyles';
+import { FONTS, FONT_SIZE, FONT_WEIGHT } from '../constants/typography';
+import { CheckIcon } from './icons/index';
 
 export type StatusVariant = 'success' | 'error' | 'warning' | 'info' | 'pending' | 'custom';
 

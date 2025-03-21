@@ -16,9 +16,9 @@ import Animated, {
   withSequence,
   Easing,
 } from 'react-native-reanimated';
-import { useTheme } from '../../context/ThemeContext';
-import { SPACING, BORDER_RADIUS } from '../../constants/globalStyles';
-import { FONTS, FONT_SIZE } from '../../constants/typography';
+import { useTheme } from '../context/ThemeContext';
+import { SPACING, BORDER_RADIUS } from '../constants/globalStyles';
+import { FONTS, FONT_SIZE } from '../constants/typography';
 
 interface OtpInputProps {
   length?: number;
@@ -255,9 +255,6 @@ const styles = StyleSheet.create({
     height: 24,
     backgroundColor: 'black',
     opacity: 0.7,
-    animationName: 'blink',
-    animationDuration: '1s',
-    animationIterationCount: 'infinite',
   },
   hiddenInput: {
     position: 'absolute',

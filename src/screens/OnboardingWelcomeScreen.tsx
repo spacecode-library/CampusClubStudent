@@ -31,6 +31,7 @@ import {
 } from '../utils/responsiveUtils';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import LogoSvg from '../components/Logosvg';
 
 type OnboardingWelcomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'OnboardingWelcome'>;
 
@@ -199,7 +200,6 @@ const OnboardingWelcomeScreen: React.FC<OnboardingWelcomeScreenProps> = ({ navig
             }
           ]}
         >
-          <View style={styles.logoContainer}>
             <View 
               style={[
                 styles.logo,
@@ -211,18 +211,12 @@ const OnboardingWelcomeScreen: React.FC<OnboardingWelcomeScreenProps> = ({ navig
                 }
               ]}
             >
-              <Text variant="headingMedium" color={colors.buttonText}>
-                CC
-              </Text>
+              <LogoSvg
+                width={logoSize * 0.6}
+                height={logoSize * 0.6}
+                fill={colors.buttonText}
+              />
             </View>
-            <Text 
-              variant={isTablet ? "displayMedium" : "displaySmall"} 
-              color="#FFFFFF" 
-              style={styles.appName}
-            >
-              CampusClub
-            </Text>
-          </View>
         </Animated.View>
         
         {/* Welcome Content */}

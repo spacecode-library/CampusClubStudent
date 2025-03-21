@@ -174,42 +174,12 @@ const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const APP_BAR_HEIGHT = 60;
   const SEARCH_BAR_HEIGHT = 50;
   const CATEGORIES_HEIGHT = 50;
-  const HEADER_EXPANDED_HEIGHT = APP_BAR_HEIGHT + SEARCH_BAR_HEIGHT + CATEGORIES_HEIGHT;
+  const HEADER_HEIGHT = APP_BAR_HEIGHT + SEARCH_BAR_HEIGHT + CATEGORIES_HEIGHT;
+  
   const HEADER_COLLAPSED_HEIGHT = Platform.OS === 'ios' ? APP_BAR_HEIGHT + insets.top : APP_BAR_HEIGHT;
-  
-  // Calculate top padding for content
-  const contentPaddingTop = HEADER_EXPANDED_HEIGHT + insets.top;
-  
-  // Animated values for collapsible header
-  const headerHeight = scrollY.interpolate({
-    inputRange: [0, HEADER_EXPANDED_HEIGHT],
-    outputRange: [HEADER_EXPANDED_HEIGHT + insets.top, HEADER_COLLAPSED_HEIGHT],
-    extrapolate: 'clamp'
-  });
-  
-  const searchBarOpacity = scrollY.interpolate({
-    inputRange: [0, HEADER_EXPANDED_HEIGHT / 2, HEADER_EXPANDED_HEIGHT],
-    outputRange: [1, 0.5, 0],
-    extrapolate: 'clamp'
-  });
-  
-  const searchBarTranslateY = scrollY.interpolate({
-    inputRange: [0, HEADER_EXPANDED_HEIGHT],
-    outputRange: [0, -50],
-    extrapolate: 'clamp'
-  });
-  
-  const categoriesOpacity = scrollY.interpolate({
-    inputRange: [0, HEADER_EXPANDED_HEIGHT / 1.5, HEADER_EXPANDED_HEIGHT],
-    outputRange: [1, 0.3, 0],
-    extrapolate: 'clamp'
-  });
-  
-  const categoriesTranslateY = scrollY.interpolate({
-    inputRange: [0, HEADER_EXPANDED_HEIGHT],
-    outputRange: [0, -50],
-    extrapolate: 'clamp'
-  });
+
+  const contentPaddingTop = HEADER_HEIGHT + insets.top;
+
   
   // Fetch data on mount and focus
   useFocusEffect(
@@ -293,17 +263,6 @@ const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     await fetchData();
   }, []);
 
-  // Handle scroll event with optimized performance
-  const handleScroll = Animated.event(
-    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-    { 
-      useNativeDriver: false,
-      listener: (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-        const currentScrollY = event.nativeEvent.contentOffset.y;
-        lastScrollY.current = currentScrollY;
-      }
-    }
-  );
 
   // Handle discount press
   const handleDiscountPress = (discount: DiscountData) => {
@@ -553,141 +512,124 @@ const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         translucent
       />
       
-      {/* Collapsible Header */}
-      <Animated.View 
+      <View 
+  style={[
+    styles.header, 
+    { 
+      height: HEADER_HEIGHT + insets.top,
+      backgroundColor: colors.background,
+      borderBottomColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+      borderBottomWidth: 1,
+      paddingTop: insets.top,
+    }
+  ]}
+>
+  {/* App Bar - Always Visible */}
+  <View style={styles.appBar}>
+    <View style={styles.appBarLeft}>
+      <Text variant="headingLarge" color={colors.text} style={styles.appTitle}>
+        CampusClub
+      </Text>
+      <Text variant="bodySmall" color={colors.textSecondary} numberOfLines={1}>
+        {studentInfo?.university || 'Xiamen University Malaysia'}
+      </Text>
+    </View>
+    
+    <View style={styles.appBarActions}>
+      <TouchableOpacity 
+        style={styles.iconButton}
+        onPress={handleRedemptionHistoryPress}
+      >
+        <SaleTagIcon size={22} color={colors.text} />
+      </TouchableOpacity>
+      
+      <TouchableOpacity style={styles.iconButton}>
+        <BellIcon size={22} color={colors.text} />
+      </TouchableOpacity>
+      
+      <TouchableOpacity 
         style={[
-          styles.header, 
+          styles.avatarButton,
           { 
-            height: headerHeight,
-            backgroundColor: colors.background,
-            borderBottomColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-            borderBottomWidth: 1,
-            paddingTop: insets.top,
+            backgroundColor: theme === 'dark' 
+              ? `${colors.primary}30` 
+              : `${colors.primary}15`,
           }
         ]}
+        onPress={handleProfilePress}
       >
-        {/* App Bar - Always Visible */}
-        <View style={styles.appBar}>
-          <View style={styles.appBarLeft}>
-            <Text variant="headingLarge" color={colors.text} style={styles.appTitle}>
-              CampusClub
-            </Text>
-            <Text variant="bodySmall" color={colors.textSecondary} numberOfLines={1}>
-              {studentInfo?.university || 'Xiamen University Malaysia'}
-            </Text>
-          </View>
-          
-          <View style={styles.appBarActions}>
-            <TouchableOpacity 
-              style={styles.iconButton}
-              onPress={handleRedemptionHistoryPress}
-            >
-              <SaleTagIcon size={22} color={colors.text} />
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.iconButton}>
-              <BellIcon size={22} color={colors.text} />
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[
-                styles.avatarButton,
-                { 
-                  backgroundColor: theme === 'dark' 
-                    ? `${colors.primary}30` 
-                    : `${colors.primary}15`,
-                }
-              ]}
-              onPress={handleProfilePress}
-            >
-              <Text variant="labelMedium" color={colors.primary} weight="bold">
-                {studentInfo?.name ? studentInfo.name.charAt(0).toUpperCase() : 'S'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-        
-        {/* Search Bar - Hides on Scroll */}
-        <Animated.View 
+        <Text variant="labelMedium" color={colors.primary} weight="bold">
+          {studentInfo?.name ? studentInfo.name.charAt(0).toUpperCase() : 'S'}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+  
+  {/* Search Bar - Always Visible */}
+  <View style={styles.searchBarContainer}>
+    <TouchableOpacity 
+      style={[
+        styles.searchBar, 
+        { 
+          backgroundColor: theme === 'dark' 
+            ? 'rgba(255,255,255,0.1)' 
+            : 'rgba(0,0,0,0.05)' 
+        }
+      ]}
+      onPress={handleSearchPress}
+      activeOpacity={0.7}
+    >
+      <SearchIcon size={18} color={colors.textSecondary} />
+      <Text 
+        variant="bodyMedium" 
+        color={colors.textSecondary}
+        style={styles.searchText}
+      >
+        Search for discounts...
+      </Text>
+    </TouchableOpacity>
+  </View>
+  
+  {/* Categories - Always Visible */}
+  <View style={styles.categoriesWrapper}>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.categoriesContainer}
+    >
+      {categories.map((category) => (
+        <TouchableOpacity
+          key={category.id}
           style={[
-            styles.searchBarContainer,
-            {
-              opacity: searchBarOpacity,
-              transform: [{ translateY: searchBarTranslateY }],
-            }
+            styles.categoryButton,
+            selectedCategory === category.id && {
+              backgroundColor: 
+                theme === 'dark' 
+                  ? `${colors.primary}30` 
+                  : `${colors.primary}15`,
+              borderColor: colors.primary,
+            },
+            selectedCategory !== category.id && {
+              borderColor: 
+                theme === 'dark' 
+                  ? 'rgba(255,255,255,0.2)' 
+                  : 'rgba(0,0,0,0.1)',
+            },
           ]}
+          onPress={() => handleCategorySelect(category.id)}
         >
-          <TouchableOpacity 
-            style={[
-              styles.searchBar, 
-              { 
-                backgroundColor: theme === 'dark' 
-                  ? 'rgba(255,255,255,0.1)' 
-                  : 'rgba(0,0,0,0.05)' 
-              }
-            ]}
-            onPress={handleSearchPress}
-            activeOpacity={0.7}
+          <Text style={styles.categoryIcon}>{category.icon}</Text>
+          <Text
+            variant="labelMedium"
+            color={selectedCategory === category.id ? colors.primary : colors.textSecondary}
           >
-            <SearchIcon size={18} color={colors.textSecondary} />
-            <Text 
-              variant="bodyMedium" 
-              color={colors.textSecondary}
-              style={styles.searchText}
-            >
-              Search for discounts...
-            </Text>
-          </TouchableOpacity>
-        </Animated.View>
-        
-        {/* Categories - Hide on Scroll */}
-        <Animated.View 
-          style={[
-            styles.categoriesWrapper,
-            {
-              opacity: categoriesOpacity,
-              transform: [{ translateY: categoriesTranslateY }],
-            }
-          ]}
-        >
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoriesContainer}
-          >
-            {categories.map((category) => (
-              <TouchableOpacity
-                key={category.id}
-                style={[
-                  styles.categoryButton,
-                  selectedCategory === category.id && {
-                    backgroundColor: 
-                      theme === 'dark' 
-                        ? `${colors.primary}30` 
-                        : `${colors.primary}15`,
-                    borderColor: colors.primary,
-                  },
-                  selectedCategory !== category.id && {
-                    borderColor: 
-                      theme === 'dark' 
-                        ? 'rgba(255,255,255,0.2)' 
-                        : 'rgba(0,0,0,0.1)',
-                  },
-                ]}
-                onPress={() => handleCategorySelect(category.id)}
-              >
-                <Text style={styles.categoryIcon}>{category.icon}</Text>
-                <Text
-                  variant="labelMedium"
-                  color={selectedCategory === category.id ? colors.primary : colors.textSecondary}
-                >
-                  {category.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </Animated.View>
-      </Animated.View>
+            {category.name}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
+  </View>
+</View>
       
       {/* Main Content */}
       {loading ? (
@@ -702,7 +644,10 @@ const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           ]}
           showsVerticalScrollIndicator={false}
           scrollEventThrottle={16}
-          onScroll={handleScroll}
+          onScroll={(event) => {
+            const currentScrollY = event.nativeEvent.contentOffset.y;
+            lastScrollY.current = currentScrollY;
+          }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -879,7 +824,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
-    overflow: 'hidden',
   },
   appBar: {
     flexDirection: 'row',

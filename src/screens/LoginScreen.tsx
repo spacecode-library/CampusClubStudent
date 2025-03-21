@@ -10,6 +10,7 @@ import {
   Dimensions,
   StatusBar,
   SafeAreaView,
+  Image,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
@@ -38,6 +39,9 @@ import {
   isSmallDevice,
   isTablet
 } from '../utils/responsiveUtils';
+
+// Import our custom LogoSvg component
+import LogoSvg from '../components/Logosvg';
 
 type LoginScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Login'>;
 
@@ -380,14 +384,12 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
                 }
               ]}
             >
-              {/* Here you would typically display a logo */}
-              <Text 
-                variant="displayLarge" 
-                color={colors.buttonText}
-                style={{ fontSize: logoSize * 0.5 }}
-              >
-                CC
-              </Text>
+             {/* Use our custom LogoSvg component */}
+             <LogoSvg
+                width={logoSize * 0.98}
+                height={logoSize * 0.98}
+                fill={colors.buttonText}
+              />
             </View>
             <Text 
               variant={isTablet ? "displayMedium" : isSmallDevice ? "headingLarge" : "displaySmall"} 
