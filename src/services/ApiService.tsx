@@ -107,6 +107,38 @@ export interface Redemption {
   updatedAt: string;
 }
 
+export interface Event {
+  _id: string;
+  userId: string;
+  title: string;
+  description: string;
+  startTime: string;
+  endTime: string;
+  backgroundImage: string;
+  termsCondition: string;
+  venue: string;
+  eventScope: 'university' | 'public';
+  status: 'upcoming' | 'live' | 'completed';
+  isDeleted: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RegisteredEvent {
+  _id: string;
+  userId: string;
+  eventId: string;
+  isDeleted: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RegisteredStudent {
+  _id: string;
+  name: string;
+  email: string;
+}
+
 class ApiService {
 
   static mapApiRedemptionToViewRedemption(apiRedemption: any): Redemption {
@@ -599,7 +631,89 @@ static async getStudentId(): Promise<string> {
   }
 
 
+// Create a new event
+static async createEvent(eventData: {
+  title: string;
+  description: string;
+  startTime: string;
+  endTime: string;
+  backgroundImage: string;
+  termsCondition: string;
+  venue: string;
+  eventScope: 'university' | 'public';
+}): Promise<ApiResponse<Event>> {
+  return this.fetchData<Event>(
+    '/event/create',
+    'POST',
+    eventData,
+    true
+  );
+}
 
+// Get events based on status and scope
+static async getEvents(filters: {
+  status: 'upcoming' | 'live' | 'completed';
+  eventScope: 'university' | 'public';
+}): Promise<ApiResponse<Event[]>> {
+  return this.fetchData<Event[]>(
+    '/event',
+    'POST',
+    filters,
+    true
+  );
+}
+
+// Register a student for an event
+static async registerForEvent(eventId: string): Promise<ApiResponse<RegisteredEvent>> {
+  return this.fetchData<RegisteredEvent>(
+    '/event/registered',
+    'POST',
+    { eventId },
+    true
+  );
+}
+
+// Get all students registered for an event
+static async getRegisteredStudents(eventId: string): Promise<ApiResponse<RegisteredStudent[]>> {
+  return this.fetchData<RegisteredStudent[]>(
+    `/event?id=${eventId}`,
+    'GET',
+    undefined,
+    true
+  );
+}
+
+// Delete an event
+static async deleteEvent(eventId: string): Promise<ApiResponse<{eventId: string}>> {
+  return this.fetchData<{eventId: string}>(
+    `/event/delete?id=${eventId}`,
+    'DELETE',
+    undefined,
+    true
+  );
+}
+
+// Edit an event
+static async editEvent(
+  eventId: string,
+  eventData: Partial<{
+    title: string;
+    description: string;
+    startTime: string;
+    endTime: string;
+    backgroundImage: string;
+    termsCondition: string;
+    venue: string;
+    eventScope: 'university' | 'public';
+  }>
+): Promise<ApiResponse<Event>> {
+  return this.fetchData<Event>(
+    `/event/edit?id=${eventId}`,
+    'PUT',
+    eventData,
+    true
+  );
+}
   
 }
 

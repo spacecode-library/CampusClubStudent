@@ -790,10 +790,10 @@ const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                 </MotiView>
               ))}
             </View>
-          </View>
+           </View>
           
           {/* Bottom padding for tab navigator */}
-          <View style={{ height: 100 }} />
+           <View style={{ height: 100 }} />
         </ScrollView>
       )}
     </View>

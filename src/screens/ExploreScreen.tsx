@@ -22,7 +22,7 @@ import Text from '../components/Text';
 import DiscountCard, { DiscountData } from '../components/DiscountCard';
 import { SPACING, BORDER_RADIUS } from '../constants/globalStyles';
 import { moderateScale } from '../utils/responsiveUtils';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import { MotiView } from 'moti';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -41,6 +41,7 @@ import ApiService from '../services/ApiService';
 
 // Import Loading Skeleton
 import Skeleton from '../components/SkeletonLoader';
+
 
 type ExploreScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Explore'>;
 
@@ -158,6 +159,7 @@ const cardWidth = width * 0.85;
 const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
   const { colors, theme } = useTheme();
   const insets = useSafeAreaInsets();
+  const frame = useSafeAreaFrame();
   
   // State
   const [searchQuery, setSearchQuery] = useState('');
@@ -490,7 +492,8 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
   );
   
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+
       <StatusBar
         barStyle={theme === 'dark' ? 'light-content' : 'dark-content'}
         backgroundColor="transparent"
@@ -586,29 +589,39 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
           {searchQuery.trim() === '' ? (
             // Show search suggestions
             <ScrollView 
-              style={styles.container}
-              contentContainerStyle={styles.scrollContent}
-              showsVerticalScrollIndicator={false}
-            >
+            style={styles.container}
+            contentContainerStyle={[
+              styles.scrollContent,
+              { paddingBottom: 80 } // Add padding for tab bar
+            ]}
+            showsVerticalScrollIndicator={false}
+          >
               {renderSearchSuggestions()}
             </ScrollView>
           ) : searchResults.length > 0 ? (
             // Show search results
             <FlatList
-              style={styles.container}
-              contentContainerStyle={styles.scrollContent}
-              data={searchResults}
-              renderItem={renderDiscountCard}
-              keyExtractor={item => item._id}
-              showsVerticalScrollIndicator={false}
-            />
+            style={styles.container}
+            contentContainerStyle={[
+              styles.scrollContent,
+              { paddingBottom: 80 } // Add padding at the bottom for tab bar
+            ]}
+            data={searchResults}
+            renderItem={renderDiscountCard}
+            keyExtractor={item => item._id}
+            showsVerticalScrollIndicator={false}
+          />
           ) : (
             // Show empty results state
             <ScrollView 
-              style={styles.container}
-              contentContainerStyle={[styles.scrollContent, styles.emptyContainer]}
-              showsVerticalScrollIndicator={false}
-            >
+            style={styles.container}
+            contentContainerStyle={[
+              styles.scrollContent, 
+              styles.emptyContainer,
+              { paddingBottom: 80 } // Add padding for tab bar
+            ]}
+            showsVerticalScrollIndicator={false}
+          >
               {renderEmptyResults()}
             </ScrollView>
           )}
@@ -616,15 +629,19 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
       ) : (
         // Regular explore view
         <ScrollView 
-          style={styles.container}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          scrollEventThrottle={16}
-          onScroll={Animated.event(
-            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-            { useNativeDriver: false }
-          )}
-        >
+        style={styles.container}
+        contentContainerStyle={[
+          styles.scrollContent,
+          // Remove the bottom spacing - content goes all the way to the edge
+          { paddingBottom: 0 } 
+        ]}
+        showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false }
+        )}
+      >
           {/* Featured Merchants Section */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
@@ -714,20 +731,23 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
           </View>
           
           {/* Bottom space for navigation */}
-          <View style={styles.bottomSpacer} />
+          <View style={{ height: 100 }}/>
         </ScrollView>
       )}
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  // Main container
   container: {
+    flex: 1,
+  },
+  scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
   },
   header: {
     paddingHorizontal: SPACING.lg,
@@ -857,9 +877,6 @@ const styles = StyleSheet.create({
   },
   mapText: {
     marginBottom: SPACING.xs,
-  },
-  bottomSpacer: {
-    height: 120, // Space for bottom navigation
   },
   // Search suggestions styles
   searchSuggestionsContainer: {

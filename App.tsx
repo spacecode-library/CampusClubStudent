@@ -23,6 +23,13 @@ import RedemptionSuccessScreen from './src/screens/RedemptionSuccessScreen';
 import ActiveRedemptionsScreen from './src/screens/ActiveRedemptionsScreen';
 import RedemptionHistoryScreen from './src/screens/RedemptionHistoryScreen';
 
+// Event Screens
+import EventDetailsScreen from './src/screens/EventDetailsScreen';
+import CreateEventScreen from './src/screens/CreateEventScreen';
+import EditEventScreen from './src/screens/EditEventScreen';
+import EventsListScreen from './src/screens/EventsListScreen';
+import EventAttendeesScreen from './src/screens/EventAttendeesScreen';
+
 // Components
 import FloatingTabBar from './src/components/FloatingTabBar';
 import { LoadingScreen } from './src/components/LoadingScreen';
@@ -75,6 +82,12 @@ export type RootStackParamList = {
   RedemptionSuccess: RedemptionSuccessParams;
   ActiveRedemptions: { redemptionId: string };
   RedemptionHistory: undefined;
+  // Event Screens
+  EventDetails: { eventId: string };
+  CreateEvent: undefined;
+  EditEvent: { eventId: string };
+  EventsList: { status: 'upcoming' | 'live' | 'completed' };
+  EventAttendees: { eventId: string };
   // Individual tab screens (needed for type safety)
   Home: undefined;
   Explore: undefined;
@@ -234,6 +247,13 @@ const App = () => {
           <Stack.Screen name="RedemptionSuccess" component={RedemptionSuccessScreen} />
           <Stack.Screen name="ActiveRedemptions" component={ActiveRedemptionsScreen} />
           <Stack.Screen name="RedemptionHistory" component={RedemptionHistoryScreen} />
+          
+          {/* Event Screens */}
+          <Stack.Screen name="EventDetails" component={EventDetailsScreen} />
+          <Stack.Screen name="CreateEvent" component={CreateEventScreen} />
+          <Stack.Screen name="EditEvent" component={EditEventScreen} />
+          <Stack.Screen name="EventsList" component={EventsListScreen} />
+          <Stack.Screen name="EventAttendees" component={EventAttendeesScreen} />
 
           {/* Individual tab screens (needed for type access but not used in navigation) */}
           <Stack.Screen name="Home" component={HomeScreen} />

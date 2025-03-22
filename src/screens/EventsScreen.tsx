@@ -1,15 +1,15 @@
 // src/screens/EventsScreen.tsx
 import React, { useState, useCallback } from 'react';
-import { 
-  View, 
-  StyleSheet, 
-  SafeAreaView, 
-  ScrollView, 
-  TouchableOpacity, 
-  Image, 
-  Animated,
+import {
+  View,
+  StyleSheet,
+  SafeAreaView,
+  ScrollView,
+  TouchableOpacity,
+  Image,
   Platform,
-  RefreshControl
+  RefreshControl,
+  ActivityIndicator
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useFocusEffect } from '@react-navigation/native';
@@ -19,9 +19,19 @@ import Text from '../components/Text';
 import { SPACING, BORDER_RADIUS } from '../constants/globalStyles';
 import { moderateScale } from '../utils/responsiveUtils';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CalendarIcon, LocationPinIcon } from '../components/NavigationIcons';
+import {
+  CalendarIcon,
+  LocationPinIcon,
+  PeopleIcon,
+  PlusIcon
+} from '../components/NavigationIcons';
 import { MotiView } from 'moti';
 import * as Haptics from 'expo-haptics';
+import EventStatusBadge from '../components/EventStatusBadge';
+import ApiService, { Event } from '../services/ApiService';
+import { format } from 'date-fns';
+import { StatusBar } from 'expo-status-bar';
+import Skeleton from '../components/Skeleton';
 
 type EventsScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Events'>;
 
@@ -29,117 +39,25 @@ interface EventsScreenProps {
   navigation: EventsScreenNavigationProp;
 }
 
-// Define the Event interface
-interface EventData {
-  id: string;
-  title: string;
-  date: string;
-  location: string;
-  image: string;
-  attending: number;
-  description?: string;
-  organizer?: string;
-  isRegistered?: boolean;
-}
-
 // Interface for EventCard props
 interface EventCardProps {
-  event: EventData;
+  event: Event;
   featured?: boolean;
-  onPress: (event: EventData) => void;
+  onPress: (event: Event) => void;
+  registeredCount?: number;
 }
-
-// Mock events data
-const upcomingEvents: EventData[] = [
-  {
-    id: '1',
-    title: 'End of Year Campus Party',
-    date: 'May 15, 2025 • 8:00 PM',
-    location: 'Student Union Hall',
-    image: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=1470&auto=format&fit=crop',
-    attending: 142,
-    description: 'Join us for a night of music, food, and fun as we celebrate the end of the academic year! Featuring live performances from student bands and DJs.',
-    organizer: 'Student Activities Board'
-  },
-  {
-    id: '2',
-    title: 'Tech Conference 2025',
-    date: 'June 3, 2025 • 10:00 AM',
-    location: 'Engineering Building',
-    image: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=1470&auto=format&fit=crop',
-    attending: 89,
-    description: 'Explore the latest innovations in technology with workshops, keynote speakers, and networking opportunities with industry professionals.',
-    organizer: 'Computer Science Department'
-  }
-];
-
-const popularEvents: EventData[] = [
-  {
-    id: '3',
-    title: 'International Food Festival',
-    date: 'April 28, 2025 • 12:00 PM',
-    location: 'Campus Quad',
-    image: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=1374&auto=format&fit=crop',
-    attending: 210,
-    description: 'Sample cuisine from around the world prepared by international student clubs. Cultural performances and activities throughout the day.',
-    organizer: 'International Student Association'
-  },
-  {
-    id: '4',
-    title: 'Student Art Exhibition',
-    date: 'May 2, 2025 • 4:00 PM',
-    location: 'Arts Building Gallery',
-    image: 'https://images.unsplash.com/photo-1526306063970-d5498ad00f1c?q=80&w=1470&auto=format&fit=crop',
-    attending: 65,
-    description: 'View artwork created by talented student artists across various mediums. Meet the artists and learn about their creative processes.',
-    organizer: 'Fine Arts Department'
-  },
-  {
-    id: '5',
-    title: 'Career Fair Spring 2025',
-    date: 'April 20, 2025 • 9:00 AM',
-    location: 'Business School Hall',
-    image: 'https://images.unsplash.com/photo-1560523159-4a9692d222f9?q=80&w=1470&auto=format&fit=crop',
-    attending: 320,
-    description: 'Connect with potential employers, explore career opportunities, and learn about internships. Professional attire recommended.',
-    organizer: 'Career Services Center'
-  }
-];
 
 const EventsScreen: React.FC<EventsScreenProps> = ({ navigation }) => {
   const { colors, theme } = useTheme();
   const insets = useSafeAreaInsets();
-  const scrollY = React.useRef(new Animated.Value(0)).current;
   
   // State variables
   const [refreshing, setRefreshing] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [events, setEvents] = useState<{
-    upcoming: EventData[],
-    popular: EventData[]
-  }>({
-    upcoming: upcomingEvents,
-    popular: popularEvents
-  });
-  
-  // Header animation values
-  const headerHeight = scrollY.interpolate({
-    inputRange: [0, 120],
-    outputRange: [moderateScale(200), moderateScale(80)],
-    extrapolate: 'clamp'
-  });
-
-  const headerOpacity = scrollY.interpolate({
-    inputRange: [0, 60, 120],
-    outputRange: [1, 0.8, 0],
-    extrapolate: 'clamp'
-  });
-
-  const titleScale = scrollY.interpolate({
-    inputRange: [0, 120],
-    outputRange: [1, 0.8],
-    extrapolate: 'clamp'
-  });
+  const [loading, setLoading] = useState(true);
+  const [upcomingEvents, setUpcomingEvents] = useState<Event[]>([]);
+  const [liveEvents, setLiveEvents] = useState<Event[]>([]);
+  const [completedEvents, setCompletedEvents] = useState<Event[]>([]);
+  const [eventRegistrationCounts, setEventRegistrationCounts] = useState<Record<string, number>>({});
 
   // Load data when screen is focused
   useFocusEffect(
@@ -148,19 +66,76 @@ const EventsScreen: React.FC<EventsScreenProps> = ({ navigation }) => {
     }, [])
   );
 
-  // Fetch events from API (mock implementation)
+  // Fetch events from API
   const fetchEvents = async () => {
     setLoading(true);
     
     try {
-      // Simulate API request
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // In a real app, these events would come from an API
-      setEvents({
-        upcoming: upcomingEvents,
-        popular: popularEvents
+      // Fetch upcoming events
+      const upcomingResponse = await ApiService.getEvents({
+        status: 'upcoming',
+        eventScope: 'university'
       });
+      
+      // Fetch live events
+      const liveResponse = await ApiService.getEvents({
+        status: 'live',
+        eventScope: 'university'
+      });
+      
+      // Fetch completed events
+      const completedResponse = await ApiService.getEvents({
+        status: 'completed',
+        eventScope: 'university'
+      });
+      
+      if (upcomingResponse.success && upcomingResponse.data) {
+        setUpcomingEvents(upcomingResponse.data);
+        
+        // Fetch registration counts for upcoming events
+        await Promise.all(upcomingResponse.data.map(async (event) => {
+          try {
+            const regResponse = await ApiService.getRegisteredStudents(event._id);
+            // Use optional chaining and nullish coalescing to safely access data
+            const count = regResponse?.data?.length ?? 0;
+            
+            if (count > 0) {
+              setEventRegistrationCounts(prev => ({
+                ...prev,
+                [event._id]: count
+              }));
+            }
+          } catch (error) {
+            console.error(`Error fetching registrations for event ${event._id}:`, error);
+          }
+        }));
+      }
+      
+      if (liveResponse.success && liveResponse.data) {
+        setLiveEvents(liveResponse.data);
+        
+        // Fetch registration counts for live events
+        await Promise.all(liveResponse.data.map(async (event) => {
+          try {
+            const regResponse = await ApiService.getRegisteredStudents(event._id);
+            // Use optional chaining and nullish coalescing to safely access data
+            const count = regResponse?.data?.length ?? 0;
+            
+            if (count > 0) {
+              setEventRegistrationCounts(prev => ({
+                ...prev,
+                [event._id]: count
+              }));
+            }
+          } catch (error) {
+            console.error(`Error fetching registrations for event ${event._id}:`, error);
+          }
+        }));
+      }
+      
+      if (completedResponse.success && completedResponse.data) {
+        setCompletedEvents(completedResponse.data);
+      }
     } catch (error) {
       console.error('Error fetching events:', error);
     } finally {
@@ -176,15 +151,13 @@ const EventsScreen: React.FC<EventsScreenProps> = ({ navigation }) => {
   };
 
   // Handle event press
-  const handleEventPress = (event: EventData) => {
+  const handleEventPress = (event: Event) => {
     // Apply haptic feedback
     if (Platform.OS === 'ios') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
 
-    // In a full implementation, navigate to an event details screen
-    // For now, show event info in an alert
-    alert(`Event: ${event.title}\n\n${event.description}\n\nOrganized by: ${event.organizer}`);
+    navigation.navigate('EventDetails', { eventId: event._id });
   };
 
   // Handle create event press
@@ -194,12 +167,33 @@ const EventsScreen: React.FC<EventsScreenProps> = ({ navigation }) => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
 
-    // In a full implementation, navigate to event creation screen
-    alert('Create Event feature coming soon!');
+    navigation.navigate('CreateEvent');
+  };
+
+  // Handle see all press
+  const handleSeeAllPress = (status: 'upcoming' | 'live' | 'completed') => {
+    navigation.navigate('EventsList', { status });
+  };
+
+  // Format date for display
+  const formatEventDate = (startTime: string, endTime: string) => {
+    try {
+      const start = new Date(startTime);
+      const end = new Date(endTime);
+      
+      const dateStr = format(start, 'MMM d, yyyy');
+      const startTimeStr = format(start, 'h:mm a');
+      const endTimeStr = format(end, 'h:mm a');
+      
+      return `${dateStr} • ${startTimeStr} - ${endTimeStr}`;
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return startTime;
+    }
   };
 
   // Event Card Component
-  const EventCard: React.FC<EventCardProps> = ({ event, featured = false, onPress }) => (
+  const EventCard: React.FC<EventCardProps> = ({ event, featured = false, onPress, registeredCount = 0 }) => (
     <MotiView
       from={{ opacity: 0, translateY: 15 }}
       animate={{ opacity: 1, translateY: 0 }}
@@ -223,12 +217,20 @@ const EventsScreen: React.FC<EventsScreenProps> = ({ navigation }) => {
         onPress={() => onPress(event)}
       >
         <Image 
-          source={{ uri: event.image }} 
+          source={{ uri: event.backgroundImage }} 
           style={[
             styles.eventImage,
             featured ? styles.featuredEventImage : styles.regularEventImage
           ]}
         />
+        
+        {/* Status badge for featured events */}
+        {featured && (
+          <View style={styles.eventStatusContainer}>
+            <EventStatusBadge status={event.status} />
+          </View>
+        )}
+        
         <View style={styles.eventContent}>
           <Text 
             variant={featured ? "titleMedium" : "titleSmall"} 
@@ -245,8 +247,9 @@ const EventsScreen: React.FC<EventsScreenProps> = ({ navigation }) => {
               variant="bodySmall" 
               color={colors.textSecondary}
               style={styles.eventMetaText}
+              numberOfLines={1}
             >
-              {event.date}
+              {formatEventDate(event.startTime, event.endTime)}
             </Text>
           </View>
           
@@ -256,190 +259,301 @@ const EventsScreen: React.FC<EventsScreenProps> = ({ navigation }) => {
               variant="bodySmall" 
               color={colors.textSecondary}
               style={styles.eventMetaText}
+              numberOfLines={1}
             >
-              {event.location}
+              {event.venue}
             </Text>
           </View>
           
           <View style={styles.attendingContainer}>
+            <PeopleIcon size={12} color={colors.primary} />
             <Text 
               variant="labelSmall" 
               color={colors.primary}
+              style={{marginLeft: 4}}
             >
-              {event.attending} attending
+              {registeredCount} attending
             </Text>
           </View>
         </View>
       </TouchableOpacity>
     </MotiView>
   );
+  
+  // Loading skeleton for event cards
+  const EventCardSkeleton: React.FC<{featured?: boolean}> = ({ featured = false }) => (
+    <View 
+      style={[
+        styles.eventCard,
+        featured ? styles.featuredEventCard : styles.regularEventCard,
+        { backgroundColor: colors.card }
+      ]}
+    >
+      <Skeleton 
+        style={[
+          featured ? styles.featuredEventImage : styles.regularEventImage,
+          { backgroundColor: `${colors.text}10` }
+        ]} 
+      />
+      <View style={styles.eventContent}>
+        <Skeleton 
+          style={{
+            height: moderateScale(18),
+            width: '80%',
+            marginBottom: SPACING.xs,
+            backgroundColor: `${colors.text}10`
+          }} 
+        />
+        <Skeleton 
+          style={{
+            height: moderateScale(12),
+            width: '70%',
+            marginBottom: SPACING.xs,
+            backgroundColor: `${colors.text}10`
+          }} 
+        />
+        <Skeleton 
+          style={{
+            height: moderateScale(12),
+            width: '60%',
+            marginBottom: SPACING.xs,
+            backgroundColor: `${colors.text}10`
+          }} 
+        />
+        <Skeleton 
+          style={{
+            height: moderateScale(12),
+            width: '40%',
+            marginTop: SPACING.xs,
+            backgroundColor: `${colors.text}10`
+          }} 
+        />
+      </View>
+    </View>
+  );
+
+  // Render empty content container
+  const renderEmptyContent = () => (
+    <View style={styles.emptyContentContainer}>
+      <Image 
+        source={require('../assets/images/empty-events.png')} 
+        style={styles.emptyStateImage} 
+        resizeMode="contain"
+      />
+      <Text variant="titleMedium" color={colors.text} style={styles.emptyStateTitle}>
+        No Events Found
+      </Text>
+      <Text variant="bodyMedium" color={colors.textSecondary} style={styles.emptyStateDescription}>
+        Be the first to create an event for your campus community!
+      </Text>
+      <TouchableOpacity 
+        style={[styles.createEventButton, { backgroundColor: colors.primary }]}
+        onPress={handleCreateEvent}
+      >
+        <Text variant="labelLarge" color={colors.onPrimary}>
+          Create Event
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* Animated Header */}
-      <Animated.View 
-        style={[
-          styles.header,
-          { 
-            backgroundColor: colors.background,
-            height: headerHeight,
-            borderBottomColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-            paddingTop: insets.top
-          }
-        ]}
-      >
-        <Animated.View style={[styles.headerContent, { opacity: headerOpacity }]}>
-          <View>
-            <Animated.Text 
-              style={[
-                styles.headerTitle, 
-                { color: colors.text, transform: [{ scale: titleScale }] }
-              ]}
-            >
-              Campus Events
-            </Animated.Text>
-            <Text variant="bodyMedium" color={colors.textSecondary}>
-              Find exciting events around campus
-            </Text>
-          </View>
-        </Animated.View>
-      </Animated.View>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+      <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
       
-      <ScrollView
-        style={[styles.container, { backgroundColor: colors.background }]}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingTop: moderateScale(210) + insets.top }
-        ]}
-        showsVerticalScrollIndicator={false}
-        scrollEventThrottle={16}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            colors={[colors.primary]}
-            tintColor={colors.primary}
-            progressViewOffset={moderateScale(210) + insets.top}
-          />
-        }
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: false }
-        )}
-      >
-        {/* Section: Upcoming Events */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text variant="titleSmall" color={colors.text}>
-              Upcoming Events
-            </Text>
-            <TouchableOpacity>
-              <Text variant="labelMedium" color={colors.primary}>
-                See All
-              </Text>
-            </TouchableOpacity>
-          </View>
-          
-          {/* Horizontal scroll for featured events */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.featuredContainer}
-            decelerationRate="fast"
-            snapToInterval={moderateScale(280) + SPACING.md}
-          >
-            {events.upcoming.map(event => (
-              <View key={event.id} style={styles.featuredCardWrapper}>
-                <EventCard event={event} featured={true} onPress={handleEventPress} />
+      {/* Header */}
+      <View style={[styles.header, { backgroundColor: colors.background }]}>
+        <Text variant="headingMedium" color={colors.text}>
+          Campus Events
+        </Text>
+        <Text variant="bodyMedium" color={colors.textSecondary}>
+          Find exciting events around campus
+        </Text>
+      </View>
+      
+      {loading ? (
+        // Loading state
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Section: Live Events */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionHeaderLeft}>
+                <Text variant="titleSmall" color={colors.text}>Live Now</Text>
+                <View style={[styles.liveIndicator, { backgroundColor: colors.error }]} />
               </View>
-            ))}
-            
-            {/* "Create Event" card */}
-            <MotiView
-              from={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ type: 'timing', duration: 500, delay: 400 }}
+              <Text variant="labelMedium" color={colors.primary}>See All</Text>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.featuredContainer}
             >
-              <TouchableOpacity
-                style={[
-                  styles.createEventCard,
-                  { 
-                    backgroundColor: theme === 'dark' ? colors.backgroundSecondary : colors.backgroundTertiary,
-                    borderColor: `${colors.primary}30`
-                  }
-                ]}
-                activeOpacity={0.8}
-                onPress={handleCreateEvent}
-              >
-                <View style={[styles.createEventIconContainer, { backgroundColor: `${colors.primary}20` }]}>
-                  <Text variant="headingLarge" color={colors.primary}>+</Text>
+              {Array(2).fill(0).map((_, index) => (
+                <View key={`live-skeleton-${index}`} style={styles.featuredCardWrapper}>
+                  <EventCardSkeleton featured={true} />
                 </View>
-                <Text variant="labelLarge" color={colors.primary} style={styles.createEventText}>
-                  Create Event
-                </Text>
-              </TouchableOpacity>
-            </MotiView>
-          </ScrollView>
-        </View>
-        
-        {/* Section: Popular Events */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text variant="titleSmall" color={colors.text}>
-              Popular Events
-            </Text>
-            <TouchableOpacity>
-              <Text variant="labelMedium" color={colors.primary}>
-                See All
-              </Text>
-            </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
           
-          {/* List of regular events */}
-          <View style={styles.regularEventsContainer}>
-            {events.popular.map((event, index) => (
-              <EventCard 
-                key={event.id} 
-                event={event} 
-                featured={false} 
-                onPress={handleEventPress} 
-              />
+          {/* Section: Upcoming Events */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text variant="titleSmall" color={colors.text}>Upcoming Events</Text>
+              <Text variant="labelMedium" color={colors.primary}>See All</Text>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.featuredContainer}
+            >
+              {Array(3).fill(0).map((_, index) => (
+                <View key={`upcoming-skeleton-${index}`} style={styles.featuredCardWrapper}>
+                  <EventCardSkeleton featured={true} />
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+          
+          {/* Section: Recent Events */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text variant="titleSmall" color={colors.text}>Recent Events</Text>
+              <Text variant="labelMedium" color={colors.primary}>See All</Text>
+            </View>
+            {Array(3).fill(0).map((_, index) => (
+              <EventCardSkeleton key={`recent-skeleton-${index}`} />
             ))}
           </View>
-        </View>
-        
-        {/* Bottom spacing for tab navigator */}
-        <View style={styles.bottomSpacer} />
-      </ScrollView>
+        </ScrollView>
+      ) : upcomingEvents.length === 0 && liveEvents.length === 0 && completedEvents.length === 0 ? (
+        // Empty state
+        renderEmptyContent()
+      ) : (
+        // Populated state
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={[colors.primary]}
+              tintColor={colors.primary}
+            />
+          }
+        >
+          {/* Section: Live Events */}
+          {liveEvents.length > 0 && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <View style={styles.sectionHeaderLeft}>
+                  <Text variant="titleSmall" color={colors.text}>Live Now</Text>
+                  <View style={[styles.liveIndicator, { backgroundColor: colors.error }]} />
+                </View>
+                <TouchableOpacity onPress={() => handleSeeAllPress('live')}>
+                  <Text variant="labelMedium" color={colors.primary}>See All</Text>
+                </TouchableOpacity>
+              </View>
+              
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.featuredContainer}
+                decelerationRate="fast"
+              >
+                {liveEvents.map(event => (
+                  <View key={event._id} style={styles.featuredCardWrapper}>
+                    <EventCard 
+                      event={event} 
+                      featured={true} 
+                      onPress={handleEventPress}
+                      registeredCount={eventRegistrationCounts[event._id] || 0}
+                    />
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+          
+          {/* Section: Upcoming Events */}
+          {upcomingEvents.length > 0 && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text variant="titleSmall" color={colors.text}>Upcoming Events</Text>
+                <TouchableOpacity onPress={() => handleSeeAllPress('upcoming')}>
+                  <Text variant="labelMedium" color={colors.primary}>See All</Text>
+                </TouchableOpacity>
+              </View>
+              
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.featuredContainer}
+                decelerationRate="fast"
+              >
+                {upcomingEvents.map(event => (
+                  <View key={event._id} style={styles.featuredCardWrapper}>
+                    <EventCard 
+                      event={event} 
+                      featured={true} 
+                      onPress={handleEventPress}
+                      registeredCount={eventRegistrationCounts[event._id] || 0}
+                    />
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+          
+          {/* Section: Recent Completed Events */}
+          {completedEvents.length > 0 && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text variant="titleSmall" color={colors.text}>Recent Events</Text>
+                <TouchableOpacity onPress={() => handleSeeAllPress('completed')}>
+                  <Text variant="labelMedium" color={colors.primary}>See All</Text>
+                </TouchableOpacity>
+              </View>
+              
+              <View>
+                {completedEvents.slice(0, 3).map(event => (
+                  <EventCard 
+                    key={event._id} 
+                    event={event} 
+                    featured={false} 
+                    onPress={handleEventPress} 
+                  />
+                ))}
+              </View>
+            </View>
+          )}
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
+  },
+  header: {
+    paddingTop: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    paddingBottom: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
   },
   scrollContent: {
     paddingHorizontal: SPACING.lg,
-  },
-  header: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 100,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.lg,
-    borderBottomWidth: 1,
-  },
-  headerContent: {
-    justifyContent: 'center',
-    height: '100%',
-  },
-  headerTitle: {
-    fontSize: moderateScale(28),
-    fontWeight: 'bold',
-    marginBottom: SPACING.xs,
+    paddingTop: SPACING.md,
+    paddingBottom: 80, // Space for bottom navigation
   },
   section: {
     marginBottom: SPACING.xl,
@@ -450,9 +564,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: SPACING.md,
   },
+  sectionHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  liveIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginLeft: SPACING.xs,
+  },
   featuredContainer: {
     paddingBottom: SPACING.xs,
-    paddingRight: SPACING.lg,
   },
   featuredCardWrapper: {
     marginRight: SPACING.md,
@@ -465,7 +588,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
   },
   featuredEventCard: {
-    width: moderateScale(280),
+    width: moderateScale(260),
     height: moderateScale(230),
   },
   regularEventCard: {
@@ -484,6 +607,12 @@ const styles = StyleSheet.create({
     width: moderateScale(100),
     height: '100%',
   },
+  eventStatusContainer: {
+    position: 'absolute',
+    top: SPACING.sm,
+    right: SPACING.sm,
+    zIndex: 1,
+  },
   eventContent: {
     padding: SPACING.md,
     flex: 1,
@@ -498,36 +627,53 @@ const styles = StyleSheet.create({
   },
   eventMetaText: {
     marginLeft: 4,
+    flex: 1,
   },
   attendingContainer: {
     marginTop: SPACING.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  createEventCard: {
-    width: moderateScale(140),
-    height: moderateScale(230),
-    borderRadius: BORDER_RADIUS.lg,
+  floatingCreateButton: {
+    position: 'absolute',
+    bottom: 80, // Adjust based on tab bar height
+    right: SPACING.lg,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    marginRight: SPACING.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
+    zIndex: 999,
   },
-  createEventIconContainer: {
-    width: moderateScale(60),
-    height: moderateScale(60),
-    borderRadius: moderateScale(30),
+  emptyContentContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: SPACING.xl,
+  },
+  emptyStateImage: {
+    width: moderateScale(150),
+    height: moderateScale(150),
+    marginBottom: SPACING.lg,
+    opacity: 0.8,
+  },
+  emptyStateTitle: {
     marginBottom: SPACING.sm,
+    textAlign: 'center',
   },
-  createEventText: {
-    fontWeight: '600',
+  emptyStateDescription: {
+    marginBottom: SPACING.lg,
+    textAlign: 'center',
   },
-  regularEventsContainer: {
-    
-  },
-  bottomSpacer: {
-    height: 120, // Increased space for floating bottom navigation
+  createEventButton: {
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.xl,
+    borderRadius: BORDER_RADIUS.md,
   },
 });
 

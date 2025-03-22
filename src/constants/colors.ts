@@ -9,6 +9,8 @@ export interface ThemeColors {
   secondaryDark: string;
   secondaryLight: string;
   accent: string;
+  onPrimary: string; // Color for text/icons on primary color backgrounds
+
   
   // Background colors
   background: string;
@@ -46,6 +48,7 @@ const lightColors: ThemeColors = {
   primary: '#5C6BC0',
   primaryDark: '#3949AB',
   primaryLight: '#7986CB',
+  onPrimary: '#FFFFFF',
   
   // Secondary colors - Teal-based for youthful accent
   secondary: '#26A69A',
@@ -91,6 +94,7 @@ const darkColors: ThemeColors = {
   primary: '#5C6BC0',
   primaryDark: '#3949AB',
   primaryLight: '#7986CB',
+  onPrimary: '#FFFFFF',
   
   // Secondary colors - Teal-based, adjusted for dark mode
   secondary: '#26A69A',

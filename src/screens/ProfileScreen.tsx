@@ -6,24 +6,32 @@ import {
   StatusBar, 
   SafeAreaView, 
   TouchableOpacity, 
-  ScrollView, 
-  Image,
-  Animated,
+  ScrollView,
   Switch,
-  Alert
+  Alert,
+  Dimensions,
+  Platform
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { CommonActions } from '@react-navigation/native';
 import { RootStackParamList } from '../../App';
 import { useTheme } from '../context/ThemeContext';
 import Text from '../components/Text';
-import Button from '../components/Button';
 import { SPACING, BORDER_RADIUS } from '../constants/globalStyles';
 import { 
   ThemeToggleIcon, 
   UserIcon, 
   EducationIcon, 
   IDCardIcon,
+  EditIcon,
+  LogoutIcon,
+  PremiumIcon,
+  RedemptionIcon,
+  CalendarIcon,
+  InfoIcon,
+  SupportIcon,
+  NotificationIcon,
+  LocationIcon
 } from '../components/icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ApiService from '../services/ApiService';
@@ -36,84 +44,80 @@ interface ProfileScreenProps {
   navigation: ProfileScreenNavigationProp;
 }
 
-// Icons for menu sections
-import { 
-  HomeIcon, 
-  ExploreIcon, 
-  EventIcon, 
-  SaleTagIcon, 
-  LocationPinIcon,
-  ProfileIcon,
-} from '../components/NavigationIcons';
+// Define interface for student information
+interface StudentInfo {
+  name?: string;
+  email?: string;
+  profileImage?: string;
+  StudentID?: string;
+  university?: string;
+  StudentCity?: string;
+  StudentCountry?: string;
+  redemptionCount?: string;
+  eventsAttended?: string;
+  savedDeals?: string;
+}
 
 const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   const { colors, theme, toggleTheme } = useTheme();
   const insets = useSafeAreaInsets();
-  const [studentInfo, setStudentInfo] = useState<any>(null);
+  const [studentInfo, setStudentInfo] = useState<StudentInfo | null>(null);
   const [loading, setLoading] = useState(false);
   const [enableNotifications, setEnableNotifications] = useState(true);
   const [enableLocationServices, setEnableLocationServices] = useState(true);
+  const [activeTab, setActiveTab] = useState(1); // Default to Account tab
   
-  // Animation values
-  const scrollY = React.useRef(new Animated.Value(0)).current;
-  const headerOpacity = scrollY.interpolate({
-    inputRange: [0, 100],
-    outputRange: [1, 0],
-    extrapolate: 'clamp'
-  });
-  
-  const headerHeight = scrollY.interpolate({
-    inputRange: [0, 100],
-    outputRange: [moderateScale(180), moderateScale(80)],
-    extrapolate: 'clamp'
-  });
-  
-  const avatarSize = scrollY.interpolate({
-    inputRange: [0, 100],
-    outputRange: [moderateScale(80), moderateScale(40)],
-    extrapolate: 'clamp'
-  });
-  
-  const avatarPosition = scrollY.interpolate({
-    inputRange: [0, 100],
-    outputRange: [0, 40],
-    extrapolate: 'clamp'
-  });
-
   useEffect(() => {
     fetchStudentInfo();
   }, []);
 
   const fetchStudentInfo = async () => {
     try {
+      setLoading(true);
       const studentStatus = await ApiService.getStudentStatus();
       if (studentStatus.success && studentStatus.data) {
         setStudentInfo(studentStatus.data);
       }
     } catch (error) {
       console.error('Error fetching student info:', error);
-    }
-  };
-
-  const handleLogout = async () => {
-    setLoading(true);
-    try {
-      await ApiService.logout();
-      // Reset navigation and go to login screen using CommonActions
-      navigation.dispatch(
-        CommonActions.reset({
-          index: 0,
-          routes: [{ name: 'Login' }],
-        })
-      );
-    } catch (error) {
-      console.error('Error logging out:', error);
     } finally {
       setLoading(false);
     }
   };
+
+  const handleLogout = () => {
+    Alert.alert(
+      "Log Out",
+      "Are you sure you want to log out?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Log Out",
+          style: "destructive",
+          onPress: async () => {
+            setLoading(true);
+            try {
+              await ApiService.logout();
+              navigation.dispatch(
+                CommonActions.reset({
+                  index: 0,
+                  routes: [{ name: 'Login' }],
+                })
+              );
+            } catch (error) {
+              console.error('Error logging out:', error);
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
   
-  // Handle switch toggles
+  // Toggle handlers
   const handleNotificationsChange = (value: boolean) => {
     setEnableNotifications(value);
   };
@@ -122,7 +126,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
     setEnableLocationServices(value);
   };
   
-  // Handle menu items
+  // Navigation handlers
   const handleEditProfile = () => {
     Alert.alert('Coming Soon', 'Edit Profile feature will be available in the next update!');
   };
@@ -143,6 +147,335 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
     Alert.alert('Help & Support', 'Need assistance? Contact us at support@campusclub.app');
   };
 
+  // Tab content
+  const renderInfoTab = () => (
+    <View style={styles.tabContent}>
+      <View style={[styles.card, { backgroundColor: colors.card }]}>
+        <Text 
+          variant="titleMedium" 
+          color={colors.text} 
+          style={{ marginBottom: SPACING.md, fontWeight: '600' }}
+        >
+          Student Information
+        </Text>
+        
+        <View style={styles.infoRow}>
+          <View style={[styles.iconContainer, { backgroundColor: colors.primary + '15' }]}>
+            <IDCardIcon size={20} color={colors.primary} />
+          </View>
+          <View>
+            <Text variant="labelSmall" color={colors.textSecondary}>
+              STUDENT ID
+            </Text>
+            <Text variant="bodyMedium" color={colors.text}>
+              {studentInfo?.StudentID || 'SWE2009962'}
+            </Text>
+          </View>
+        </View>
+        
+        <View style={styles.infoRow}>
+          <View style={[styles.iconContainer, { backgroundColor: colors.primary + '15' }]}>
+            <EducationIcon size={20} color={colors.primary} />
+          </View>
+          <View>
+            <Text variant="labelSmall" color={colors.textSecondary}>
+              UNIVERSITY
+            </Text>
+            <Text variant="bodyMedium" color={colors.text}>
+              {studentInfo?.university || 'Xiamen University Malaysia'}
+            </Text>
+          </View>
+        </View>
+        
+        <View style={styles.infoRow}>
+          <View style={[styles.iconContainer, { backgroundColor: colors.primary + '15' }]}>
+            <LocationIcon size={20} color={colors.primary} />
+          </View>
+          <View>
+            <Text variant="labelSmall" color={colors.textSecondary}>
+              LOCATION
+            </Text>
+            <Text variant="bodyMedium" color={colors.text}>
+              {studentInfo?.StudentCity 
+                ? `${studentInfo.StudentCity}, ${studentInfo.StudentCountry || ''}` 
+                : 'Ampang, Malaysia'}
+            </Text>
+          </View>
+        </View>
+      </View>
+      
+      <View style={[styles.statsCard, { backgroundColor: colors.card }]}>
+        <View style={styles.statsRow}>
+          <View style={styles.statColumn}>
+            <Text variant="headingMedium" color={colors.primary}>
+              {studentInfo?.redemptionCount || '12'}
+            </Text>
+            <Text variant="bodySmall" color={colors.textSecondary}>
+              Redemptions
+            </Text>
+          </View>
+          
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
+          
+          <View style={styles.statColumn}>
+            <Text variant="headingMedium" color={colors.primary}>
+              {studentInfo?.eventsAttended || '7'}
+            </Text>
+            <Text variant="bodySmall" color={colors.textSecondary}>
+              Events
+            </Text>
+          </View>
+          
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
+          
+          <View style={styles.statColumn}>
+            <Text variant="headingMedium" color={colors.primary}>
+              {studentInfo?.savedDeals || '23'}
+            </Text>
+            <Text variant="bodySmall" color={colors.textSecondary}>
+              Saved
+            </Text>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+  
+  const renderAccountTab = () => (
+    <View style={styles.tabContent}>
+      <TouchableOpacity 
+        style={styles.premiumCardContainer}
+        onPress={handleSubscription}
+        activeOpacity={0.9}
+      >
+        <View style={[styles.premiumCard, { backgroundColor: '#FF8800' }]}>
+          <View style={styles.premiumContent}>
+            <View style={styles.premiumIconContainer}>
+              <PremiumIcon size={24} color="#FFFFFF" />
+            </View>
+            <View style={styles.premiumTextContainer}>
+              <Text variant="titleMedium" color="#FFFFFF" style={{ fontWeight: '700' }}>
+                CampusClub Premium
+              </Text>
+              <Text variant="bodySmall" color="#FFFFFF" style={{ opacity: 0.9 }}>
+                Unlock exclusive discounts and features
+              </Text>
+            </View>
+            <View style={styles.upgradeButtonContainer}>
+              <View style={styles.upgradeButton}>
+                <Text variant="labelSmall" color="#FF8800" style={{ fontWeight: '600' }}>
+                  UPGRADE
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+      
+      <View style={[styles.card, { backgroundColor: colors.card }]}>
+        <TouchableOpacity style={styles.menuItem} onPress={handleViewRedemptions}>
+          <View style={styles.menuRow}>
+            <View style={[styles.iconContainer, { backgroundColor: colors.primary + '15' }]}>
+              <RedemptionIcon size={20} color={colors.primary} />
+            </View>
+            <View>
+              <Text variant="bodyMedium" color={colors.text}>My Redemptions</Text>
+              <Text variant="bodySmall" color={colors.textSecondary}>View your discount history</Text>
+            </View>
+          </View>
+          <View style={styles.chevronContainer}>
+            <Text style={{ color: colors.textSecondary, fontSize: 18 }}>›</Text>
+          </View>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[styles.menuItem, { borderTopWidth: 1, borderTopColor: colors.border }]} 
+          onPress={() => navigation.navigate('Events')}
+        >
+          <View style={styles.menuRow}>
+            <View style={[styles.iconContainer, { backgroundColor: colors.primary + '15' }]}>
+              <CalendarIcon size={20} color={colors.primary} />
+            </View>
+            <View>
+              <Text variant="bodyMedium" color={colors.text}>Upcoming Events</Text>
+              <Text variant="bodySmall" color={colors.textSecondary}>See events you've registered for</Text>
+            </View>
+          </View>
+          <View style={styles.chevronContainer}>
+            <Text style={{ color: colors.textSecondary, fontSize: 18 }}>›</Text>
+          </View>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[styles.menuItem, { borderTopWidth: 1, borderTopColor: colors.border }]} 
+          onPress={handleEditProfile}
+        >
+          <View style={styles.menuRow}>
+            <View style={[styles.iconContainer, { backgroundColor: colors.primary + '15' }]}>
+              <EditIcon size={20} color={colors.primary} />
+            </View>
+            <View>
+              <Text variant="bodyMedium" color={colors.text}>Edit Profile</Text>
+              <Text variant="bodySmall" color={colors.textSecondary}>Update your information</Text>
+            </View>
+          </View>
+          <View style={styles.chevronContainer}>
+            <Text style={{ color: colors.textSecondary, fontSize: 18 }}>›</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+      
+      <View style={[styles.card, { backgroundColor: colors.card, marginTop: SPACING.md }]}>
+        <TouchableOpacity style={styles.menuItem} onPress={handleAbout}>
+          <View style={styles.menuRow}>
+            <View style={[styles.iconContainer, { backgroundColor: colors.primary + '15' }]}>
+              <InfoIcon size={20} color={colors.primary} />
+            </View>
+            <Text variant="bodyMedium" color={colors.text}>About CampusClub</Text>
+          </View>
+          <View style={styles.chevronContainer}>
+            <Text style={{ color: colors.textSecondary, fontSize: 18 }}>›</Text>
+          </View>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[styles.menuItem, { borderTopWidth: 1, borderTopColor: colors.border }]} 
+          onPress={handleHelp}
+        >
+          <View style={styles.menuRow}>
+            <View style={[styles.iconContainer, { backgroundColor: colors.primary + '15' }]}>
+              <SupportIcon size={20} color={colors.primary} />
+            </View>
+            <Text variant="bodyMedium" color={colors.text}>Help & Support</Text>
+          </View>
+          <View style={styles.chevronContainer}>
+            <Text style={{ color: colors.textSecondary, fontSize: 18 }}>›</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+  
+  const renderSettingsTab = () => (
+    <View style={styles.tabContent}>
+      <View style={[styles.card, { backgroundColor: colors.card }]}>
+        <Text 
+          variant="titleSmall" 
+          color={colors.text} 
+          style={{ marginBottom: SPACING.sm, fontWeight: '600' }}
+        >
+          Appearance
+        </Text>
+        
+        <View style={styles.settingRow}>
+          <View style={styles.settingLeft}>
+            <View style={[styles.iconContainer, { backgroundColor: colors.primary + '15' }]}>
+              <ThemeToggleIcon size={20} color={colors.primary} />
+            </View>
+            <View>
+              <Text variant="bodyMedium" color={colors.text}>Dark Mode</Text>
+              <Text variant="bodySmall" color={colors.textSecondary}>
+                {theme === 'dark' ? 'Currently enabled' : 'Currently disabled'}
+              </Text>
+            </View>
+          </View>
+          <Switch
+            value={theme === 'dark'}
+            onValueChange={toggleTheme}
+            trackColor={{ false: '#767577', true: colors.primary + '70' }}
+            thumbColor={theme === 'dark' ? colors.primary : '#f4f3f4'}
+            ios_backgroundColor="#3e3e3e"
+          />
+        </View>
+      </View>
+      
+      <View style={[styles.card, { backgroundColor: colors.card, marginTop: SPACING.md }]}>
+        <Text 
+          variant="titleSmall" 
+          color={colors.text} 
+          style={{ marginBottom: SPACING.sm, fontWeight: '600' }}
+        >
+          Notifications
+        </Text>
+        
+        <View style={styles.settingRow}>
+          <View style={styles.settingLeft}>
+            <View style={[styles.iconContainer, { backgroundColor: colors.primary + '15' }]}>
+              <NotificationIcon size={20} color={colors.primary} />
+            </View>
+            <View>
+              <Text variant="bodyMedium" color={colors.text}>Push Notifications</Text>
+              <Text variant="bodySmall" color={colors.textSecondary}>
+                Receive alerts about new discounts
+              </Text>
+            </View>
+          </View>
+          <Switch
+            value={enableNotifications}
+            onValueChange={handleNotificationsChange}
+            trackColor={{ false: '#767577', true: colors.primary + '70' }}
+            thumbColor={enableNotifications ? colors.primary : '#f4f3f4'}
+            ios_backgroundColor="#3e3e3e"
+          />
+        </View>
+      </View>
+      
+      <View style={[styles.card, { backgroundColor: colors.card, marginTop: SPACING.md }]}>
+        <Text 
+          variant="titleSmall" 
+          color={colors.text} 
+          style={{ marginBottom: SPACING.sm, fontWeight: '600' }}
+        >
+          Privacy
+        </Text>
+        
+        <View style={styles.settingRow}>
+          <View style={styles.settingLeft}>
+            <View style={[styles.iconContainer, { backgroundColor: colors.primary + '15' }]}>
+              <LocationIcon size={20} color={colors.primary} />
+            </View>
+            <View>
+              <Text variant="bodyMedium" color={colors.text}>Location Services</Text>
+              <Text variant="bodySmall" color={colors.textSecondary}>
+                Find discounts near you
+              </Text>
+            </View>
+          </View>
+          <Switch
+            value={enableLocationServices}
+            onValueChange={handleLocationChange}
+            trackColor={{ false: '#767577', true: colors.primary + '70' }}
+            thumbColor={enableLocationServices ? colors.primary : '#f4f3f4'}
+            ios_backgroundColor="#3e3e3e"
+          />
+        </View>
+      </View>
+      
+      <TouchableOpacity
+        style={[
+          styles.logoutButton,
+          { backgroundColor: theme === 'dark' ? 'rgba(255,59,48,0.15)' : 'rgba(255,59,48,0.1)' }
+        ]}
+        onPress={handleLogout}
+      >
+        <View style={styles.logoutIconContainer}>
+          <LogoutIcon size={20} color="#FF3B30" />
+        </View>
+        <Text variant="bodyLarge" color="#FF3B30" style={{ fontWeight: '600' }}>
+          Log Out
+        </Text>
+      </TouchableOpacity>
+      
+      <Text 
+        variant="labelSmall" 
+        color={colors.textSecondary} 
+        style={{ textAlign: 'center', marginTop: SPACING.lg, marginBottom: SPACING.xxl }}
+      >
+        CampusClub v1.0.0
+      </Text>
+    </View>
+  );
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar
@@ -151,321 +484,87 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
         translucent
       />
       
-      {/* Animated Header */}
-      <Animated.View 
-        style={[
-          styles.header, 
-          { 
-            backgroundColor: colors.background,
-            height: headerHeight,
-            borderBottomColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-            paddingTop: insets.top + SPACING.md,
-          }
-        ]}
+      <ScrollView 
+        style={styles.container} 
+        contentContainerStyle={{ 
+          paddingBottom: Math.max(20, insets.bottom),
+        }}
+        showsVerticalScrollIndicator={false}
       >
-        <View style={styles.headerTitleContainer}>
-          <Text variant="headingLarge" color={colors.text}>
-            Profile
-          </Text>
-          <TouchableOpacity
-            style={styles.themeToggle}
-            onPress={toggleTheme}
-          >
-            <ThemeToggleIcon size={24} color={colors.text} />
-          </TouchableOpacity>
-        </View>
-        
-        <Animated.View style={[styles.profilePreview, { opacity: headerOpacity }]}>
-          <Animated.View 
-            style={[
-              styles.profileImageContainer, 
-              { 
-                backgroundColor: theme === 'dark' ? colors.backgroundSecondary : colors.backgroundTertiary,
-                width: avatarSize,
-                height: avatarSize,
-                borderRadius: Animated.divide(avatarSize, new Animated.Value(2)),
-                transform: [{ translateX: avatarPosition }]
-              }
-            ]}
-          >
-            <Text 
-              variant="headingLarge" 
-              color={colors.primary}
-              style={{ fontSize: moderateScale(32) }}
+        {/* Profile Header Section */}
+        <View style={styles.profileContainer}>
+          {/* Avatar */}
+          <View style={[styles.avatarContainer, { borderColor: colors.primary + '30' }]}>
+            <View style={[styles.avatar, { backgroundColor: colors.primary + '20' }]}>
+              <Text 
+                variant="headingLarge" 
+                color={colors.primary}
+                style={{ fontSize: moderateScale(32) }}
+              >
+                {studentInfo?.name ? studentInfo.name.charAt(0) : 'S'}
+              </Text>
+            </View>
+            <TouchableOpacity 
+              style={[styles.editButton, { backgroundColor: colors.primary }]}
+              onPress={handleEditProfile}
             >
-              {studentInfo?.name ? studentInfo.name.charAt(0) : 'S'}
-            </Text>
-          </Animated.View>
+              <EditIcon size={16} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
           
-          <Animated.View style={[styles.profileInfo, { opacity: headerOpacity }]}>
-            <Text variant="titleMedium" color={colors.text} numberOfLines={1}>
+          {/* User Info */}
+          <View style={styles.userInfo}>
+            <Text 
+              variant="headingMedium" 
+              color={colors.text}
+              style={{ fontWeight: '600' }}
+            >
               {studentInfo?.name || 'Student'}
             </Text>
-            <Text variant="bodyMedium" color={colors.textSecondary} numberOfLines={1}>
-              {studentInfo?.email || 'student@example.com'}
+            <Text variant="bodyMedium" color={colors.textSecondary}>
+              {studentInfo?.email || 'SWE2009962@xmu.edu.my'}
             </Text>
-          </Animated.View>
-        </Animated.View>
-      </Animated.View>
-      
-      <ScrollView 
-        style={[styles.container, { backgroundColor: colors.background }]}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingTop: moderateScale(190) }
-        ]}
-        showsVerticalScrollIndicator={false}
-        scrollEventThrottle={16}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: false }
-        )}
-      >
-        {/* Student info card */}
-        <View 
-          style={[
-            styles.infoCard, 
-            { 
-              backgroundColor: colors.card,
-              shadowColor: theme === 'dark' ? '#000' : '#888',
-            }
-          ]}
-        >
-          <View style={styles.infoCardHeader}>
-            <Text variant="titleSmall" color={colors.text}>
-              Student Information
-            </Text>
-            <TouchableOpacity onPress={handleEditProfile}>
-              <Text variant="labelMedium" color={colors.primary}>
-                Edit
-              </Text>
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.infoRow}>
-            <IDCardIcon size={20} color={colors.primary} style={styles.infoIcon} />
-            <View style={styles.infoTextContainer}>
-              <Text variant="labelSmall" color={colors.textSecondary}>
-                STUDENT ID
-              </Text>
-              <Text variant="bodyMedium" color={colors.text}>
-                {studentInfo?.StudentID || 'Not set'}
-              </Text>
-            </View>
-          </View>
-          
-          <View style={styles.infoRow}>
-            <EducationIcon size={20} color={colors.primary} style={styles.infoIcon} />
-            <View style={styles.infoTextContainer}>
-              <Text variant="labelSmall" color={colors.textSecondary}>
-                UNIVERSITY
-              </Text>
-              <Text variant="bodyMedium" color={colors.text}>
-                {studentInfo?.university || 'Not set'}
-              </Text>
-            </View>
-          </View>
-          
-          <View style={styles.infoRow}>
-            <LocationPinIcon size={20} color={colors.primary} style={styles.infoIcon} />
-            <View style={styles.infoTextContainer}>
-              <Text variant="labelSmall" color={colors.textSecondary}>
-                LOCATION
-              </Text>
-              <Text variant="bodyMedium" color={colors.text}>
-                {studentInfo?.StudentCity ? `${studentInfo.StudentCity}, ${studentInfo.StudentCountry || ''}` : 'Not set'}
-              </Text>
-            </View>
-          </View>
-        </View>
-        
-        {/* Main menu sections */}
-        <View style={styles.menuSection}>
-          <Text variant="titleSmall" color={colors.text} style={styles.sectionTitle}>
-            Your Account
-          </Text>
-          
-          <View 
-            style={[
-              styles.menuCard, 
-              { 
-                backgroundColor: colors.card,
-                shadowColor: theme === 'dark' ? '#000' : '#888',
-              }
-            ]}
-          >
-            <TouchableOpacity 
-              style={[styles.menuItem, { borderBottomColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}
-              onPress={handleViewRedemptions}
-            >
-              <View style={styles.menuItemContent}>
-                <View style={[styles.menuIconContainer, { backgroundColor: `${colors.primary}15` }]}>
-                  <SaleTagIcon size={20} color={colors.primary} />
-                </View>
-                <Text variant="bodyLarge" color={colors.text}>
-                  My Redemptions
-                </Text>
-              </View>
-              <Text variant="labelLarge" color={colors.textTertiary}>
-                &rsaquo;
-              </Text>
-            </TouchableOpacity>
             
-            <TouchableOpacity 
-              style={[styles.menuItem, { borderBottomColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}
-              onPress={handleSubscription}
-            >
-              <View style={styles.menuItemContent}>
-                <View style={[styles.menuIconContainer, { backgroundColor: `${colors.primary}15` }]}>
-                  <StarIcon size={20} color={colors.primary} />
-                </View>
-                <Text variant="bodyLarge" color={colors.text}>
-                  CampusClub Premium
+            <View style={styles.premiumBadge}>
+              <View style={styles.premiumBadgeBackground}>
+                <Text 
+                  variant="labelSmall" 
+                  color="#FFFFFF" 
+                  style={{ fontWeight: '600' }}
+                >
+                  PREMIUM
                 </Text>
               </View>
-              <View style={[styles.premiumBadge, { backgroundColor: colors.primary }]}>
-                <Text variant="labelSmall" color="#FFFFFF">UPGRADE</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-        </View>
-        
-        {/* Settings sections */}
-        <View style={styles.settingsSection}>
-          <Text variant="titleSmall" color={colors.text} style={styles.sectionTitle}>
-            Settings
-          </Text>
-          
-          <View 
-            style={[
-              styles.settingsCard, 
-              { 
-                backgroundColor: colors.card,
-                shadowColor: theme === 'dark' ? '#000' : '#888',
-              }
-            ]}
-          >
-            {/* Notifications toggle */}
-            <View style={[styles.settingsRow, { borderBottomColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
-              <View style={styles.settingInfo}>
-                <View style={[styles.settingIconContainer, { backgroundColor: `${colors.primary}20` }]}>
-                  <Text style={styles.settingIcon}>🔔</Text>
-                </View>
-                <View>
-                  <Text variant="bodyLarge" color={colors.text}>
-                    Notifications
-                  </Text>
-                  <Text variant="bodySmall" color={colors.textSecondary}>
-                    Receive alerts about new discounts
-                  </Text>
-                </View>
-              </View>
-              <Switch
-                value={enableNotifications}
-                onValueChange={handleNotificationsChange}
-                trackColor={{ false: '#767577', true: `${colors.primary}90` }}
-                thumbColor={enableNotifications ? colors.primary : '#f4f3f4'}
-                ios_backgroundColor="#3e3e3e"
-              />
-            </View>
-            
-            {/* Location services toggle */}
-            <View style={styles.settingsRow}>
-              <View style={styles.settingInfo}>
-                <View style={[styles.settingIconContainer, { backgroundColor: `${colors.primary}20` }]}>
-                  <Text style={styles.settingIcon}>📍</Text>
-                </View>
-                <View>
-                  <Text variant="bodyLarge" color={colors.text}>
-                    Location Services
-                  </Text>
-                  <Text variant="bodySmall" color={colors.textSecondary}>
-                    Find discounts near you
-                  </Text>
-                </View>
-              </View>
-              <Switch
-                value={enableLocationServices}
-                onValueChange={handleLocationChange}
-                trackColor={{ false: '#767577', true: `${colors.primary}90` }}
-                thumbColor={enableLocationServices ? colors.primary : '#f4f3f4'}
-                ios_backgroundColor="#3e3e3e"
-              />
             </View>
           </View>
         </View>
         
-        {/* Help sections */}
-        <View style={styles.menuSection}>
-          <Text variant="titleSmall" color={colors.text} style={styles.sectionTitle}>
-            App
-          </Text>
-          
-          <View 
-            style={[
-              styles.menuCard, 
-              { 
-                backgroundColor: colors.card,
-                shadowColor: theme === 'dark' ? '#000' : '#888',
-              }
-            ]}
-          >
-            <TouchableOpacity 
-              style={[styles.menuItem, { borderBottomColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}
-              onPress={handleAbout}
+        {/* Tabs Navigation */}
+        <View style={[styles.tabBar, { backgroundColor: colors.background }]}>
+          {['Info', 'Account', 'Settings'].map((tab, index) => (
+            <TouchableOpacity
+              key={index}
+              style={[
+                styles.tab,
+                activeTab === index && [styles.activeTab, { borderBottomColor: colors.primary }]
+              ]}
+              onPress={() => setActiveTab(index)}
             >
-              <View style={styles.menuItemContent}>
-                <View style={[styles.menuIconContainer, { backgroundColor: `${colors.primary}15` }]}>
-                  <Text style={styles.menuIcon}>ℹ️</Text>
-                </View>
-                <Text variant="bodyLarge" color={colors.text}>
-                  About CampusClub
-                </Text>
-              </View>
-              <Text variant="labelLarge" color={colors.textTertiary}>
-                &rsaquo;
+              <Text 
+                variant="bodyMedium" 
+                color={activeTab === index ? colors.primary : colors.textSecondary}
+                style={{ fontWeight: activeTab === index ? '600' : '400' }}
+              >
+                {tab}
               </Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.menuItem}
-              onPress={handleHelp}
-            >
-              <View style={styles.menuItemContent}>
-                <View style={[styles.menuIconContainer, { backgroundColor: `${colors.primary}15` }]}>
-                  <Text style={styles.menuIcon}>❓</Text>
-                </View>
-                <Text variant="bodyLarge" color={colors.text}>
-                  Help & Support
-                </Text>
-              </View>
-              <Text variant="labelLarge" color={colors.textTertiary}>
-                &rsaquo;
-              </Text>
-            </TouchableOpacity>
-          </View>
+          ))}
         </View>
         
-        {/* Logout button */}
-        <Button
-          title="Log Out"
-          onPress={handleLogout}
-          loading={loading}
-          style={styles.logoutButton}
-        />
-
-        {/* App version */}
-        <Text 
-          variant="labelSmall" 
-          color={colors.textTertiary}
-          align="center"
-          style={styles.versionText}
-        >
-          CampusClub v1.0.0
-        </Text>
-        
-        {/* Bottom spacing for navigation */}
-        <View style={styles.bottomSpacer} />
+        {/* Tab Content */}
+        {activeTab === 0 && renderInfoTab()}
+        {activeTab === 1 && renderAccountTab()}
+        {activeTab === 2 && renderSettingsTab()}
       </ScrollView>
     </SafeAreaView>
   );
@@ -475,162 +574,256 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollContent: {
-    paddingHorizontal: SPACING.lg,
-  },
-  header: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 100,
-    paddingHorizontal: SPACING.lg,
-    borderBottomWidth: 1,
-  },
-  headerTitleContainer: {
+  profileContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.lg,
     alignItems: 'center',
   },
-  themeToggle: {
-    padding: SPACING.xs,
+  avatarContainer: {
+    width: moderateScale(80),
+    height: moderateScale(80),
+    borderRadius: moderateScale(40),
+    borderWidth: 3,
+    position: 'relative',
+    overflow: 'visible',
   },
-  profilePreview: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: SPACING.lg,
-  },
-  profileImageContainer: {
+  avatar: {
+    width: '100%',
+    height: '100%',
+    borderRadius: moderateScale(40),
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: SPACING.md,
   },
-  profileInfo: {
+  editButton: {
+    position: 'absolute',
+    right: -4,
+    bottom: -4,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 2,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  userInfo: {
+    marginLeft: SPACING.md,
     flex: 1,
   },
-  infoCard: {
-    borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.lg,
-    marginBottom: SPACING.lg,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 2,
+  premiumBadge: {
+    marginTop: SPACING.xs,
+    alignSelf: 'flex-start',
   },
-  infoCardHeader: {
+  premiumBadgeBackground: {
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 4,
+    borderRadius: BORDER_RADIUS.sm,
+    backgroundColor: '#FF8800',
+    overflow: 'hidden',
+  },
+  
+  // Tab Navigation
+  tabBar: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    height: 48,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(150, 150, 150, 0.2)',
+  },
+  tab: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
+    borderBottomWidth: 3,
+    borderBottomColor: 'transparent',
+  },
+  activeTab: {
+    borderBottomWidth: 3,
+  },
+  
+  // Tab Content
+  tabContent: {
+    padding: SPACING.lg,
+  },
+  
+  // Cards
+  card: {
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.md,
     marginBottom: SPACING.md,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
   },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: SPACING.md,
   },
-  infoIcon: {
-    marginRight: SPACING.md,
+  
+  // Stats Card
+  statsCard: {
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
   },
-  infoTextContainer: {
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+  },
+  statColumn: {
     flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.sm,
   },
-  settingsSection: {
-    marginBottom: SPACING.lg,
+  divider: {
+    width: 1,
+    height: '60%',
+    opacity: 0.3,
   },
-  sectionTitle: {
-    marginBottom: SPACING.sm,
-    marginLeft: SPACING.xs,
-  },
-  settingsCard: {
+  
+  // Premium Card
+  premiumCardContainer: {
+    marginBottom: SPACING.md,
     borderRadius: BORDER_RADIUS.lg,
     overflow: 'hidden',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#FFA500',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
   },
-  settingsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  premiumCard: {
+    borderRadius: BORDER_RADIUS.lg,
     padding: SPACING.md,
-    borderBottomWidth: 1,
+    overflow: 'hidden',
   },
-  settingInfo: {
+  premiumContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
   },
-  settingIconContainer: {
-    width: moderateScale(40),
-    height: moderateScale(40),
-    borderRadius: moderateScale(20),
+  premiumIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: SPACING.md,
   },
-  settingIcon: {
-    fontSize: 18,
+  premiumTextContainer: {
+    flex: 1,
   },
-  menuSection: {
-    marginBottom: SPACING.lg,
+  upgradeButtonContainer: {
+    marginLeft: SPACING.sm,
   },
-  menuCard: {
-    borderRadius: BORDER_RADIUS.lg,
-    overflow: 'hidden',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+  upgradeButton: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 6,
+    borderRadius: BORDER_RADIUS.sm,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.2,
+        shadowRadius: 1.5,
+      },
+      android: {
+        elevation: 1,
+      },
+    }),
   },
+  
+  // Menu Items
   menuItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.md,
-    borderBottomWidth: 1,
+    paddingVertical: SPACING.sm,
   },
-  menuItemContent: {
-    flex: 1,
+  menuRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
-  menuIconContainer: {
-    width: moderateScale(40),
-    height: moderateScale(40),
-    borderRadius: moderateScale(20),
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: SPACING.md,
   },
-  menuIcon: {
-    fontSize: 18,
+  chevronContainer: {
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  premiumBadge: {
-    paddingHorizontal: SPACING.xs,
-    paddingVertical: 4,
-    borderRadius: BORDER_RADIUS.sm,
+  
+  // Settings
+  settingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: SPACING.sm,
   },
+  settingLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  
+  // Logout Button
   logoutButton: {
-    marginBottom: SPACING.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
+    marginTop: SPACING.lg,
   },
-  versionText: {
-    marginBottom: SPACING.xxl,
-  },
-  bottomSpacer: {
-    height: 100, // Space for bottom navigation
+  logoutIconContainer: {
+    marginRight: SPACING.sm,
   },
 });
-
-// Add missing components
-const StarIcon = ({ size, color, style }: { size: number, color: string, style?: any }) => {
-  // This is a placeholder - replace with your actual icon component
-  return (
-    <View style={[{ width: size, height: size }, style]}>
-      <Text style={{ color: color, fontSize: size * 0.8 }}>★</Text>
-    </View>
-  );
-};
 
 export default ProfileScreen;
