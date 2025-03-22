@@ -41,7 +41,7 @@ import {
 } from '../utils/responsiveUtils';
 
 // Import our custom LogoSvg component
-import LogoSvg from '../components/Logosvg';
+import LogoSvg from '../components/LogoSvg';
 
 type LoginScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Login'>;
 

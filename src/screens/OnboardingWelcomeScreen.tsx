@@ -31,7 +31,7 @@ import {
 } from '../utils/responsiveUtils';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import LogoSvg from '../components/Logosvg';
+import LogoSvg from '../components/LogoSvg';
 
 type OnboardingWelcomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'OnboardingWelcome'>;
 

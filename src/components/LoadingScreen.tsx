@@ -15,7 +15,7 @@ import { moderateScale } from '../utils/responsiveUtils';
 import LottieView from 'lottie-react-native';
 
 // Import the LogoSvg component we created
-import LogoSvg from '../components/Logosvg';
+import LogoSvg from './LogoSvg';
 
 const { width, height } = Dimensions.get('window');
 
