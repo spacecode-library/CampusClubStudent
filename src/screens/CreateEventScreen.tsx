@@ -47,7 +47,6 @@ import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 // We'll use a TextInput for location instead of GooglePlacesAutocomplete to avoid crypto errors
 // import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
-import MapView, { Marker } from 'react-native-maps';
 import * as Calendar from 'expo-calendar';
 import * as Sharing from 'expo-sharing';
 import LottieView from 'lottie-react-native';
@@ -581,6 +580,11 @@ const CreateEventScreen: React.FC<CreateEventScreenProps> = ({ navigation }) => 
     return (progress / 7) * 100;
   };
   
+// Add this function to your component
+const getStaticMapUrl = (latitude: number, longitude: number) => {
+  return `https://maps.googleapis.com/maps/api/staticmap?center=${latitude},${longitude}&zoom=15&size=600x300&markers=color:red%7C${latitude},${longitude}&key=AIzaSyD7_tt95oyNRydKL0CzELwfDq25wTVb-Nk`;
+};
+
   const progressPercentage = calculateProgress();
   const progressWidth = animation.interpolate({
     inputRange: [0, 1],
@@ -1011,26 +1015,15 @@ const CreateEventScreen: React.FC<CreateEventScreenProps> = ({ navigation }) => 
             )}
             
             {/* Map Preview */}
-            {venueCoordinates && (
-              <View style={styles.mapPreviewContainer}>
-                <MapView
-                  style={styles.mapPreview}
-                  region={{
-                    latitude: venueCoordinates.latitude,
-                    longitude: venueCoordinates.longitude,
-                    latitudeDelta: 0.005,
-                    longitudeDelta: 0.005,
-                  }}
-                >
-                  <Marker
-                    coordinate={{
-                      latitude: venueCoordinates.latitude,
-                      longitude: venueCoordinates.longitude,
-                    }}
-                  />
-                </MapView>
-              </View>
-            )}
+                    {venueCoordinates && (
+          <View style={styles.mapPreviewContainer}>
+            <Image
+              source={{ uri: getStaticMapUrl(venueCoordinates.latitude, venueCoordinates.longitude) }}
+              style={styles.mapPreview}
+              resizeMode="cover"
+            />
+          </View>
+        )}
             
             {/* Validation error for venue */}
             {validationErrors.venue && (
