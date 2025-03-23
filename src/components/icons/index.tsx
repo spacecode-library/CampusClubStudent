@@ -832,6 +832,70 @@ export const CalendarIcon: React.FC<IconProps> = ({ size = 24, color, ...props }
   );
 };
 
+// MapPinIcon - For location display
+export const MapPinIcon: React.FC<IconProps> = ({ size = 24, color, ...props }) => {
+  const { colors } = useTheme();
+  const iconColor = color || colors.text;
+  
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" {...props}>
+      <Path
+        d="M12 21C16.5 17.4 20 13.7764 20 10C20 5.58172 16.4183 2 12 2C7.58172 2 4 5.58172 4 10C4 13.7764 7.5 17.4 12 21Z"
+        stroke={iconColor}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Circle
+        cx="12"
+        cy="10"
+        r="3"
+        stroke={iconColor}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+};
+
+// MessageIcon - For chat/messaging
+export const MessageIcon: React.FC<IconProps> = ({ size = 24, color, ...props }) => {
+  const { colors } = useTheme();
+  const iconColor = color || colors.text;
+  
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" {...props}>
+      <Path
+        d="M21 11.5C21.0034 12.8199 20.6951 14.1219 20.1 15.3C19.3944 16.7118 18.3098 17.8992 16.9674 18.7293C15.6251 19.5594 14.0782 19.9994 12.5 20C11.1801 20.0035 9.87812 19.6951 8.7 19.1L3 21L4.9 15.3C4.30493 14.1219 3.99656 12.8199 4 11.5C4.00061 9.92179 4.44061 8.37488 5.27072 7.03258C6.10083 5.69028 7.28825 4.6056 8.7 3.90003C9.87812 3.30496 11.1801 2.99659 12.5 3.00003H13C15.0843 3.11502 17.053 3.99479 18.5291 5.47089C20.0052 6.94699 20.885 8.91568 21 11V11.5Z"
+        stroke={iconColor}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+};
+
+// PhoneIcon - For calling
+export const PhoneIcon: React.FC<IconProps> = ({ size = 24, color, ...props }) => {
+  const { colors } = useTheme();
+  const iconColor = color || colors.text;
+  
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" {...props}>
+      <Path
+        d="M22 16.92V19.92C22.0011 20.1985 21.9441 20.4742 21.8325 20.7294C21.7209 20.9845 21.5573 21.2136 21.3521 21.4019C21.1468 21.5902 20.9046 21.7335 20.6407 21.8227C20.3769 21.9119 20.0974 21.9451 19.82 21.92C16.7428 21.5856 13.787 20.5341 11.19 18.85C8.77383 17.3147 6.72534 15.2662 5.19 12.85C3.49998 10.2412 2.44824 7.27099 2.12 4.18002C2.09501 3.90363 2.1272 3.62536 2.21537 3.36259C2.30354 3.09982 2.44568 2.85866 2.63294 2.65438C2.8202 2.4501 3.04827 2.28738 3.30233 2.17579C3.5564 2.06421 3.83111 2.00714 4.11 2.00002H7.11C7.59531 1.99522 8.06579 2.16708 8.43376 2.48354C8.80173 2.79999 9.04208 3.23945 9.11 3.72002C9.23679 4.68008 9.47345 5.62274 9.81 6.53002C9.94455 6.88793 9.97366 7.27692 9.89391 7.65089C9.81415 8.02485 9.62886 8.36812 9.36 8.64002L8.09 9.91002C9.51355 12.4136 11.5865 14.4865 14.09 15.91L15.36 14.64C15.6319 14.3711 15.9752 14.1858 16.3491 14.1061C16.7231 14.0263 17.1121 14.0554 17.47 14.19C18.3773 14.5266 19.3199 14.7632 20.28 14.89C20.7658 14.9585 21.2094 15.2032 21.5265 15.5775C21.8437 15.9518 22.0122 16.4296 22 16.92Z"
+        stroke={iconColor}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+};
+
+
 // Share Icon
 export const ShareIcon: React.FC<IconProps> = ({ size = 24, color, ...props }) => {
   const { colors } = useTheme();

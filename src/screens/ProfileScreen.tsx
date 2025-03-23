@@ -168,7 +168,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
               STUDENT ID
             </Text>
             <Text variant="bodyMedium" color={colors.text}>
-              {studentInfo?.StudentID || 'SWE2009962'}
+              {studentInfo?.StudentID || ''}
             </Text>
           </View>
         </View>
@@ -182,7 +182,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
               UNIVERSITY
             </Text>
             <Text variant="bodyMedium" color={colors.text}>
-              {studentInfo?.university || 'Xiamen University Malaysia'}
+              {studentInfo?.university }
             </Text>
           </View>
         </View>
@@ -198,7 +198,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
             <Text variant="bodyMedium" color={colors.text}>
               {studentInfo?.StudentCity 
                 ? `${studentInfo.StudentCity}, ${studentInfo.StudentCountry || ''}` 
-                : 'Ampang, Malaysia'}
+                : ''}
             </Text>
           </View>
         </View>
@@ -519,7 +519,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
               color={colors.text}
               style={{ fontWeight: '600' }}
             >
-              {studentInfo?.name || 'Student'}
+              {studentInfo?.name }
             </Text>
             <Text variant="bodyMedium" color={colors.textSecondary}>
               {studentInfo?.email || 'SWE2009962@xmu.edu.my'}

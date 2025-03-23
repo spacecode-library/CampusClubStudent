@@ -13,7 +13,11 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.kingdipper.CampusClubStudent",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -35,7 +39,9 @@
         "expo-build-properties",
         {
           "android": {
-            "excludedPackages": ["com.ijzerenhein.sharedelement"]
+            "excludedPackages": [
+              "com.ijzerenhein.sharedelement"
+            ]
           }
         }
       ]

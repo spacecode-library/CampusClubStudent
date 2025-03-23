@@ -191,9 +191,6 @@ const validateForm = (): boolean => {
   } else if (!/\S+@\S+\.\S+/.test(email)) { 
     newErrors.email = 'Email is invalid';
     isValid = false;
-  } else if (!email.includes('.edu')) {
-    newErrors.email = 'Please use your university email (.edu)';
-    isValid = false;
   }
 
   // Password validation

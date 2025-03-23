@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Alert } from 'react-native';
 
 // Screens
 import LoginScreen from './src/screens/LoginScreen';
@@ -170,45 +171,118 @@ const App = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isOnboardingCompleted, setIsOnboardingCompleted] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
+  const [hasError, setHasError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
     // Check authentication status and user onboarding status
     const checkAuth = async () => {
       try {
+        console.log('Starting authentication check...');
+        
+        // First, check if the user is logged in
         const isUserLoggedIn = await ApiService.isLoggedIn();
+        console.log('User logged in status:', isUserLoggedIn);
         setIsLoggedIn(isUserLoggedIn);
 
         if (isUserLoggedIn) {
-          const studentStatus = await ApiService.getStudentStatus();
-          if (studentStatus.success && studentStatus.data) {
-            // User has started onboarding.
-            setIsOnboardingCompleted(true);
-            // Set verified flag if the user is verified.
-            setIsVerified(
-              studentStatus.data.isVerified && 
-              studentStatus.data.status === 'VERIFIED'
-            );
-          } else {
+          try {
+            // Only attempt to get student status if user is logged in
+            console.log('Fetching student status...');
+            const studentStatus = await ApiService.getStudentStatus();
+            console.log('Student status response:', studentStatus);
+            
+            if (studentStatus.success && studentStatus.data) {
+              // User has started onboarding
+              setIsOnboardingCompleted(true);
+              // Set verified flag if the user is verified
+              setIsVerified(
+                studentStatus.data.isVerified && 
+                studentStatus.data.status === 'VERIFIED'
+              );
+              console.log('Student verification status:', studentStatus.data.isVerified, studentStatus.data.status);
+            } else {
+              // Student status failed but user is logged in - they need to complete onboarding
+              setIsOnboardingCompleted(false);
+              setIsVerified(false);
+              
+              // If there's a specific message, log it
+              if (studentStatus.message) {
+                console.warn('Student status warning:', studentStatus.message);
+              }
+            }
+          } catch (statusError) {
+            // Error getting student status - likely needs to complete onboarding
+            console.error('Error fetching student status:', statusError);
             setIsOnboardingCompleted(false);
             setIsVerified(false);
+            
+            // If it's a parsing error, the API might be returning non-JSON
+            if (statusError instanceof SyntaxError) {
+              console.error('JSON parsing error - API may be returning non-JSON response');
+              setHasError(true);
+              setErrorMessage('Server returned an invalid response. Please try again later.');
+              // Force logout on critical API errors
+              await ApiService.logout();
+              setIsLoggedIn(false);
+            }
           }
+        } else {
+          // User is not logged in, reset other state
+          setIsOnboardingCompleted(false);
+          setIsVerified(false);
         }
-      } catch (error) {
-        console.error('Auth check error:', error);
+      } catch (error: any) {
+        console.error('Auth check critical error:', error);
+        
+        // Handle critical errors - set error state
+        setHasError(true);
+        setErrorMessage(error.message || 'Authentication check failed');
+        
+        // Default to not logged in for safety
+        setIsLoggedIn(false);
+        setIsOnboardingCompleted(false);
+        setIsVerified(false);
+        
+        // Force logout on critical errors
+        try {
+          await ApiService.logout();
+        } catch (logoutError) {
+          console.error('Error during forced logout:', logoutError);
+        }
       } finally {
+        // Always finish loading
         setIsLoading(false);
+        console.log('Authentication check completed');
       }
     };
 
     checkAuth();
   }, []);
 
+  // Show a loading screen while checking auth status
   if (isLoading) {
     return <LoadingScreen />;
   }
 
+  // If there was a critical error during auth check, we can show an error
+  // but still proceed to the login screen
+  if (hasError) {
+    // Show an alert about the error but continue to the login screen
+    setTimeout(() => {
+      Alert.alert(
+        'Connection Error',
+        errorMessage || 'Could not connect to the server. Please check your internet connection and try again.',
+        [{ text: 'OK' }]
+      );
+    }, 500);
+  }
+
   // Choose initial route based on the authentication and onboarding status.
+  // Default to Login when not authenticated
   let initialRoute: keyof RootStackParamList = 'Login';
+  
+  // Only change route if we're actually logged in
   if (isLoggedIn) {
     if (!isOnboardingCompleted) {
       initialRoute = 'OnboardingWelcome';
@@ -218,6 +292,13 @@ const App = () => {
       initialRoute = 'MainTabs';
     }
   }
+  
+  console.log('Navigation route determined:', { 
+    isLoggedIn, 
+    isOnboardingCompleted, 
+    isVerified, 
+    initialRoute 
+  });
 
   return (
     <ThemeProvider>

@@ -289,27 +289,81 @@ static async getStudentId(): Promise<string> {
         body: body ? JSON.stringify(body) : undefined,
       });
       
-      const data = await response.json();
-      
+      // Check if response is ok before trying to parse JSON
       if (!response.ok) {
-        // Handle token refresh if 401
+        // Check for 401 - Unauthorized error
         if (response.status === 401 && requiresAuth) {
           const refreshed = await this.refreshToken();
           if (refreshed) {
             // Retry the request
             return this.fetchData(endpoint, method, body, requiresAuth);
           }
+          // If refresh failed, return appropriate error
+          return {
+            success: false,
+            message: 'Authentication failed. Please log in again.',
+          };
         }
         
+        // For other error status codes
+// Inside fetchData, modify the catch block for parsing errors:
+try {
+  const errorText = await response.text(); // Get the raw response text
+  console.error('Raw server response:', errorText.substring(0, 200)); // Log first 200 chars to see what's coming back
+  
+  // Try to parse it as JSON (this will likely fail)
+            try {
+              const errorData = JSON.parse(errorText);
+              return {
+                success: false,
+                message: Array.isArray(errorData.message) ? errorData.message[0] : errorData.message,
+              };
+            } catch (jsonError) {
+              // If it contains HTML, it's likely a server error page
+              if (errorText.includes('<!DOCTYPE html>') || errorText.includes('<html')) {
+                console.error('Server returned HTML instead of JSON - likely a server error page');
+                return {
+                  success: false,
+                  message: 'Server error: API returned an HTML page instead of JSON',
+                };
+              }
+              return {
+                success: false,
+                message: `Server error: ${response.status} ${response.statusText}`,
+              };
+            }
+          } catch (textError) {
+            console.error('Error reading response body:', textError);
+            return {
+              success: false,
+              message: `Server error: ${response.status} ${response.statusText}`,
+            };
+          }
+      }
+      
+      // Safely parse the JSON response
+      try {
+        const data = await response.json();
+        return data as ApiResponse<T>;
+      } catch (parseError) {
+        console.error('Error parsing JSON response:', parseError);
         return {
           success: false,
-          message: Array.isArray(data.message) ? data.message[0] : data.message || 'An error occurred',
+          message: 'Failed to parse server response. The server may be returning invalid JSON.',
         };
       }
       
-      return data as ApiResponse<T>;
     } catch (error: any) {
       console.error('API Error:', error);
+      
+      // Check if it's a network error
+      if (error.message && error.message.includes('Network request failed')) {
+        return {
+          success: false,
+          message: 'Network error. Please check your internet connection.',
+        };
+      }
+      
       return {
         success: false,
         message: error.message || 'An unexpected error occurred',
@@ -319,6 +373,41 @@ static async getStudentId(): Promise<string> {
   
   // Auth Methods
   
+  // Check if user is logged in
+  static async isLoggedIn(): Promise<boolean> {
+    try {
+      const token = await AsyncStorage.getItem(TOKEN_KEY);
+      if (!token) return false;
+      
+      // Optionally validate the token (lightweight check)
+      const userJson = await AsyncStorage.getItem(USER_KEY);
+      if (!userJson) return false;
+      
+      // If you want to verify with the server (optional)
+      // Uncomment this to check token validity with server
+      /*
+      try {
+        const response = await this.fetchData<{valid: boolean}>(
+          '/user/validate-token',
+          'GET',
+          undefined,
+          true
+        );
+        return response.success && response.data?.valid === true;
+      } catch (err) {
+        console.error('Token validation error:', err);
+        return false;
+      }
+      */
+      
+      return true;
+    } catch (error) {
+      console.error('Error checking login status:', error);
+      return false;
+    }
+  }
+  
+  // Rest of the methods remain unchanged...
   // Register a new user
   static async register(name: string, email: string, password: string): Promise<ApiResponse<{id: string}>> {
     return this.fetchData<{id: string}>(
@@ -416,15 +505,28 @@ static async getStudentId(): Promise<string> {
         body: JSON.stringify({ refreshToken }),
       });
       
-      const data = await response.json() as ApiResponse<AuthResponse>;
+      // Handle non-JSON responses
+      if (!response.ok) {
+        console.error('Token refresh failed with status:', response.status);
+        await this.logout();
+        return false;
+      }
       
-      if (data.success && data.data) {
-        // Update stored tokens
-        await AsyncStorage.setItem(TOKEN_KEY, data.data.token);
-        await AsyncStorage.setItem(REFRESH_TOKEN_KEY, data.data.refreshToken);
-        return true;
-      } else {
-        // Refresh failed
+      try {
+        const data = await response.json() as ApiResponse<AuthResponse>;
+        
+        if (data.success && data.data) {
+          // Update stored tokens
+          await AsyncStorage.setItem(TOKEN_KEY, data.data.token);
+          await AsyncStorage.setItem(REFRESH_TOKEN_KEY, data.data.refreshToken);
+          return true;
+        } else {
+          // Refresh failed
+          await this.logout();
+          return false;
+        }
+      } catch (jsonError) {
+        console.error('Error parsing refresh token response:', jsonError);
         await this.logout();
         return false;
       }
@@ -463,14 +565,27 @@ static async getStudentId(): Promise<string> {
     }
   }
   
-  // Check if user is logged in
-  static async isLoggedIn(): Promise<boolean> {
-    const token = await AsyncStorage.getItem(TOKEN_KEY);
-    return !!token;
-  }
-  
   // Student Onboarding Methods
   
+  // Get student status
+  static async getStudentStatus(): Promise<ApiResponse<StudentDetails>> {
+    try {
+      return await this.fetchData<StudentDetails>(
+        '/student/status',
+        'GET',
+        undefined,
+        true
+      );
+    } catch (error: any) {
+      console.error('Error getting student status:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to get student status',
+      };
+    }
+  }
+  
+  // Other methods remain the same...
   // Initiate email verification
   static async initiateVerification(
     email: string,
@@ -529,16 +644,31 @@ static async getStudentId(): Promise<string> {
         body: file,
       });
       
-      const data = await response.json();
-      
+      // Handle non-JSON responses
       if (!response.ok) {
-        return {
-          success: false,
-          message: Array.isArray(data.message) ? data.message[0] : data.message || 'An error occurred',
-        };
+        try {
+          const errorData = await response.json();
+          return {
+            success: false,
+            message: Array.isArray(errorData.message) ? errorData.message[0] : errorData.message || 'An error occurred',
+          };
+        } catch (jsonError) {
+          return {
+            success: false,
+            message: `Server error: ${response.status} ${response.statusText}`,
+          };
+        }
       }
       
-      return data as ApiResponse<any>;
+      try {
+        const data = await response.json();
+        return data as ApiResponse<any>;
+      } catch (jsonError) {
+        return {
+          success: false,
+          message: 'Failed to parse server response',
+        };
+      }
     } catch (error: any) {
       console.error('API Error:', error);
       return {
@@ -547,16 +677,7 @@ static async getStudentId(): Promise<string> {
       };
     }
   }
-  
-  // Get student status
-  static async getStudentStatus(): Promise<ApiResponse<StudentDetails>> {
-    return this.fetchData<StudentDetails>(
-      '/student/status',
-      'GET',
-      undefined,
-      true
-    );
-  }
+
   
   // Discount related methods
   

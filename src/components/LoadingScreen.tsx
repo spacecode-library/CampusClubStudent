@@ -15,7 +15,7 @@ import { moderateScale } from '../utils/responsiveUtils';
 import LottieView from 'lottie-react-native';
 
 // Import the LogoSvg component we created
-import LogoSvg from './LogoSvg';
+import LogoSvg from './LogoSVG-LS';
 
 const { width, height } = Dimensions.get('window');
 
@@ -72,9 +72,6 @@ export const LoadingScreen = () => {
         useNativeDriver: true,
       }),
     ]).start();
-
-    // Start pulse animation for the logo
-    startPulseAnimation();
     
     // Start progress animation
     startProgressAnimation();
@@ -101,25 +98,6 @@ export const LoadingScreen = () => {
     return () => clearInterval(messageInterval);
   }, []);
 
-  // Pulse animation for the logo
-  const startPulseAnimation = () => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.1,
-          duration: 1000,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1000,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-  };
 
   // Progress bar animation
   const startProgressAnimation = () => {
@@ -159,20 +137,13 @@ export const LoadingScreen = () => {
         <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
           <View style={styles.logoContainer}>
             <LogoSvg 
-              width={moderateScale(200)} 
-              height={moderateScale(80)} 
+              width={moderateScale(500)} 
+              height={moderateScale(200)} 
               fill="#FFFFFF"
             />
           </View>
         </Animated.View>
-        
-        <Text
-          variant="headingLarge"
-          color="#FFFFFF"
-          style={styles.appName}
-        >
-          CampusClub
-        </Text>
+
         
         {/* Loading message */}
         <Animated.View style={{ opacity: messageAnim, marginTop: 20 }}>
