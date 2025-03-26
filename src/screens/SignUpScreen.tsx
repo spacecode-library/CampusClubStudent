@@ -64,7 +64,6 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-
   
   // UI state
   const [loading, setLoading] = useState(false);
@@ -73,8 +72,7 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState('');
   const [requestId, setRequestId] = useState('');
-  const [touched, setTouched] = useState({ email: false });
-
+  
   // Scroll state
   const scrollViewRef = useRef<ScrollView>(null);
   
@@ -167,51 +165,56 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
     });
   };
   
-
-const validateForm = (): boolean => {
-  let isValid = true;
-  const newErrors = {
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    otp: '',
-  };
-
-  // Name validation
-  if (!name.trim()) {
-    newErrors.name = 'Name is required';
-    isValid = false;
-  }
-
-  // Email validation
-  if (!email.trim()) {
-    newErrors.email = 'Email is required';
-    isValid = false;
-  } else if (!/\S+@\S+\.\S+/.test(email)) { 
+  // Validate the form
+  const validateForm = (): boolean => {
+    let isValid = true;
+    const newErrors = {
+      name: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+      otp: '',
+    };
+    
+    // Name validation
+    if (!name.trim()) {
+      newErrors.name = 'Name is required';
+      isValid = false;
+    }
+    
+// Email validation
+if (!email.trim()) {
+  newErrors.email = 'Email is required';
+  isValid = false;
+} else {
+  // A more robust email regex
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  if (!emailRegex.test(email)) {
     newErrors.email = 'Email is invalid';
     isValid = false;
   }
+}
 
-  // Password validation
-  if (!password) {
-    newErrors.password = 'Password is required';
-    isValid = false;
-  } else if (password.length < 8) {
-    newErrors.password = 'Password should be at least 8 characters';
-    isValid = false;
-  }
-
-  // Confirm password validation
-  if (password !== confirmPassword) {
-    newErrors.confirmPassword = 'Passwords do not match';
-    isValid = false;
-  }
-
-  setErrors(newErrors);
-  return isValid;
-};
-
+    
+    // Password validation
+    if (!password) {
+      newErrors.password = 'Password is required';
+      isValid = false;
+    } else if (password.length < 8) {
+      newErrors.password = 'Password should be at least 8 characters';
+      isValid = false;
+    }
+    
+    // Confirm password validation
+    if (password !== confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match';
+      isValid = false;
+    }
+    
+    setErrors(newErrors);
+    
+    return isValid;
+  };
   
   // Validate OTP
   const validateOtp = (): boolean => {
@@ -268,34 +271,7 @@ const validateForm = (): boolean => {
     }
   };
   
-  const validateEmail = (emailText: string) => {
-    // Clear any existing email error first
-    let newErrors = {...errors, email: ''};
-    
-    // Only show validation errors if they've entered something
-    if (emailText.trim()) {
-      if (!/\S+@\S+\.\S+/.test(emailText)) {
-        newErrors.email = 'Email is invalid';
-      }
-    }
-    
-    setErrors(newErrors);
-  };
-
-  // Update the setEmail function to also clear the error
-  const handleEmailChange = (text: string) => {
-    setEmail(text);
-    validateEmail(text);
-  };
-
-
-  const handleEmailBlur = () => {
-    // Mark the field as touched so that errors will be shown
-    setTouched({ ...touched, email: true });
-    validateEmail(email);
-  };
-
-
+  
   // Handle OTP verification
   const handleVerifyOtp = async () => {
     if (!validateOtp()) return;
@@ -303,9 +279,11 @@ const validateForm = (): boolean => {
     setLoading(true);
     
     try {
-      const response = await ApiService.verifyStudentOtp(requestId, otp);
+      const response = await ApiService.verifyRegistrationOtp(requestId, otp);
       
-      if (response.success && response.data) {
+      console.log('OTP verification response:', response);
+      
+      if (response.data) {
         // Store user information INCLUDING THE EMAIL
         const userInfo = {
           id: response.data.identityId,
@@ -354,7 +332,6 @@ const validateForm = (): boolean => {
       setLoading(false);
     }
   };
-  
   
   // Navigate to login screen
   const goToLogin = () => {
@@ -515,17 +492,16 @@ const validateForm = (): boolean => {
                 />
                 
                 <Input
-                      label="University Email"
-                      placeholder="E.g youremail@university.edu"
-                      value={email}
-                      onChangeText={handleEmailChange}
-                      onBlur={handleEmailBlur} 
-                      leftIcon={<EmailIcon size={20} color={colors.primary} />}
-                      error={touched.email ? errors.email : ''} 
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                      disabled={loading}
-                    />
+                  label="University Email"
+                  placeholder="Email"
+                  value={email}
+                  onChangeText={setEmail}
+                  leftIcon={<EmailIcon size={20} color={colors.primary} />}
+                  error={errors.email}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  disabled={loading}
+                />
                 
                 <Input
                   label="Password"
@@ -537,7 +513,7 @@ const validateForm = (): boolean => {
                   onRightIconPress={() => setShowPassword(!showPassword)}
                   error={errors.password}
                   secure={!showPassword}
-                  disabled={loading === true}
+                  disabled={loading}
                 />
                 
                 <Input

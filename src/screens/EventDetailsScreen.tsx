@@ -1,5 +1,4 @@
-// src/screens/EventDetailsScreen.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -8,9 +7,10 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Share,
-  Alert,
   Platform,
-  Linking
+  Linking,
+  Animated,
+  Modal,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RouteProp } from '@react-navigation/native';
@@ -20,16 +20,18 @@ import Text from '../components/Text';
 import { SPACING, BORDER_RADIUS } from '../constants/globalStyles';
 import { moderateScale } from '../utils/responsiveUtils';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { 
-  CalendarIcon, 
-  LocationPinIcon, 
-  PeopleIcon, 
-  BackIcon, 
-  ShareIcon, 
-  EditIcon, 
+import {
+  CalendarIcon,
+  LocationPinIcon,
+  PeopleIcon,
+  BackIcon,
+  ShareIcon,
+  EditIcon,
   TrashIcon,
-  InfoIcon
+  InfoIcon,
+
 } from '../components/NavigationIcons';
+import { AlertCircleIcon, XIcon, CheckCircleIcon} from '../components/icons/index';
 import * as Haptics from 'expo-haptics';
 import EventStatusBadge from '../components/EventStatusBadge';
 import ApiService, { Event, RegisteredStudent } from '../services/ApiService';
@@ -40,6 +42,7 @@ import { BlurView } from 'expo-blur';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Skeleton from '../components/Skeleton';
 import ConfettiCannon from 'react-native-confetti-cannon';
+import Button from '../components/Button';
 
 type EventDetailsScreenNavigationProp = StackNavigationProp<RootStackParamList, 'EventDetails'>;
 type EventDetailsScreenRouteProp = RouteProp<RootStackParamList, 'EventDetails'>;
@@ -49,11 +52,20 @@ interface EventDetailsScreenProps {
   route: EventDetailsScreenRouteProp;
 }
 
+// Alert types for in-screen alerts
+type AlertType = 'error' | 'success' | 'info' | null;
+
+interface AlertData {
+  type: AlertType;
+  message: string;
+  title?: string;
+}
+
 const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, route }) => {
   const { eventId } = route.params;
   const { colors, theme } = useTheme();
   const insets = useSafeAreaInsets();
-  
+
   // State variables
   const [loading, setLoading] = useState(true);
   const [event, setEvent] = useState<Event | null>(null);
@@ -63,101 +75,129 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
   const [registering, setRegistering] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
-  
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [alert, setAlert] = useState<AlertData | null>(null);
+
+  // Animation refs
+  const modalAnimation = useRef(new Animated.Value(0)).current;
+  const alertAnimation = useRef(new Animated.Value(0)).current;
+
+  // Show in-screen alert
+  const showAlert = (type: AlertType, message: string, title?: string, duration = 5000) => {
+    setAlert({ type, message, title });
+
+    Animated.spring(alertAnimation, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 80,
+      friction: 8,
+    }).start();
+
+    if (duration > 0) {
+      setTimeout(() => {
+        hideAlert();
+      }, duration);
+    }
+  };
+
+  // Hide in-screen alert
+  const hideAlert = () => {
+    Animated.timing(alertAnimation, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setAlert(null);
+    });
+  };
+
   // Fetch event data and check if user is registered
   useEffect(() => {
     const fetchEventDetails = async () => {
       setLoading(true);
       try {
-        // Get current user ID
         const userJson = await AsyncStorage.getItem('@campusclub:user');
         const currentUserId = userJson ? JSON.parse(userJson).id : null;
         setUserId(currentUserId);
-        
-        // Fetch individual events by querying all events and filtering
+
         const upcomingResponse = await ApiService.getEvents({
-          status: 'upcoming',
-          eventScope: 'university'
+          status: 'UPCOMING',
+          eventScope: 'UNIVERSITY',
         });
-        
+
         const liveResponse = await ApiService.getEvents({
-          status: 'live',
-          eventScope: 'university'
+          status: 'LIVE',
+          eventScope: 'UNIVERSITY',
         });
-        
+
         const completedResponse = await ApiService.getEvents({
-          status: 'completed',
-          eventScope: 'university'
+          status: 'COMPLETED',
+          eventScope: 'UNIVERSITY',
         });
-        
-        // Combine all events and find the one with matching ID
+
         const allEvents = [
           ...(upcomingResponse.success && upcomingResponse.data ? upcomingResponse.data : []),
           ...(liveResponse.success && liveResponse.data ? liveResponse.data : []),
-          ...(completedResponse.success && completedResponse.data ? completedResponse.data : [])
+          ...(completedResponse.success && completedResponse.data ? completedResponse.data : []),
         ];
-        
-        const foundEvent = allEvents.find(e => e._id === eventId);
-        
+
+        const foundEvent = allEvents.find((e) => e._id === eventId);
+
         if (foundEvent) {
           setEvent(foundEvent);
-          
-          // Check if current user is the creator
           setIsCreator(foundEvent.userId === currentUserId);
-          
-          // Fetch registered students
+
           const registrationsResponse = await ApiService.getRegisteredStudents(foundEvent._id);
-          
+
           if (registrationsResponse.success && registrationsResponse.data) {
             setRegisteredStudents(registrationsResponse.data);
-            
-            // Check if current user is registered
             const isRegistered = registrationsResponse.data.some(
-              student => student._id === currentUserId
+              (student) => student._id === currentUserId
             );
             setUserRegistered(isRegistered);
           }
         }
       } catch (error) {
         console.error('Error fetching event details:', error);
-        Alert.alert('Error', 'Failed to load event details');
+        showAlert('error', 'Failed to load event details', 'Error');
       } finally {
         setLoading(false);
       }
     };
-    
+
     fetchEventDetails();
   }, [eventId]);
-  
+
   // Format date for display
   const formatEventDate = (startTime: string, endTime: string) => {
     try {
       const start = new Date(startTime);
       const end = new Date(endTime);
-      
+
       const dateStr = format(start, 'EEEE, MMMM d, yyyy');
       const startTimeStr = format(start, 'h:mm a');
       const endTimeStr = format(end, 'h:mm a');
-      
+
       return {
         date: dateStr,
-        time: `${startTimeStr} - ${endTimeStr}`
+        time: `${startTimeStr} - ${endTimeStr}`,
       };
     } catch (error) {
       console.error('Error formatting date:', error);
       return {
         date: 'Date unavailable',
-        time: 'Time unavailable'
+        time: 'Time unavailable',
       };
     }
   };
-  
+
   // Handle share event
   const handleShare = async () => {
     if (!event) return;
-    
+
     try {
-      const result = await Share.share({
+      await Share.share({
         message: `Check out this event: ${event.title} at ${event.venue} on ${
           formatEventDate(event.startTime, event.endTime).date
         }`,
@@ -167,186 +207,235 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
       console.error('Error sharing event:', error);
     }
   };
-  
+
   // Handle register for event
   const handleRegister = async () => {
     if (!event || registering) return;
-    
+
     try {
       setRegistering(true);
-      
-      // Apply haptic feedback
+
       if (Platform.OS === 'ios') {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       }
-      
+
       const response = await ApiService.registerForEvent(event._id);
-      
+
       if (response.success) {
         setUserRegistered(true);
-        
-        // Add current user to registered students
+
         if (userId) {
           const userJson = await AsyncStorage.getItem('@campusclub:user');
           const userData = userJson ? JSON.parse(userJson) : {};
-          
+
           const newRegisteredStudent: RegisteredStudent = {
             _id: userId,
             name: userData.name || 'You',
             email: userData.email || '',
           };
-          
-          setRegisteredStudents(prev => [...prev, newRegisteredStudent]);
-          
-          // Show confetti animation
+
+          setRegisteredStudents((prev) => [...prev, newRegisteredStudent]);
           setShowConfetti(true);
         }
       } else {
-        Alert.alert('Registration Failed', response.message?.toString() || 'Failed to register for event');
+        showAlert('error', response.message?.toString() || 'Failed to register for event', 'Registration Failed');
       }
     } catch (error) {
       console.error('Error registering for event:', error);
-      Alert.alert('Registration Error', 'An unexpected error occurred');
+      showAlert('error', 'An unexpected error occurred', 'Registration Error');
     } finally {
       setRegistering(false);
     }
   };
-  
+
   // Handle edit event
   const handleEdit = () => {
     if (!event) return;
-    
-    // Apply haptic feedback
+
     if (Platform.OS === 'ios') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-    
+
     navigation.navigate('EditEvent', { eventId: event._id });
   };
-  
-  // Handle delete event
-  const handleDelete = () => {
+
+  // Show delete modal
+  const handleShowDeleteModal = () => {
     if (!event) return;
-    
-    // Apply haptic feedback
+
     if (Platform.OS === 'ios') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
-    
-    Alert.alert(
-      'Delete Event',
-      'Are you sure you want to delete this event? This action cannot be undone.',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const response = await ApiService.deleteEvent(event._id);
-              
-              if (response.success) {
-                navigation.goBack();
-              } else {
-                Alert.alert('Delete Failed', response.message?.toString() || 'Failed to delete event');
-              }
-            } catch (error) {
-              console.error('Error deleting event:', error);
-              Alert.alert('Delete Error', 'An unexpected error occurred');
-            }
-          },
-        },
-      ]
-    );
+
+    setShowDeleteModal(true);
+    Animated.spring(modalAnimation, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 80,
+      friction: 8,
+    }).start();
   };
-  
+
+  // Hide delete modal
+  const handleHideDeleteModal = () => {
+    Animated.timing(modalAnimation, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setShowDeleteModal(false);
+    });
+
+    if (Platform.OS === 'ios') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  };
+
+  // Handle delete event
+  const handleDelete = async () => {
+    if (!event) return;
+
+    setDeleting(true);
+
+    try {
+      const response = await ApiService.deleteEvent(event._id);
+
+      if (response.success) {
+        showAlert('success', 'Event deleted successfully', 'Success', 1500);
+        setTimeout(() => {
+          navigation.goBack();
+        }, 1500);
+      } else {
+        showAlert('error', response.message?.toString() || 'Failed to delete event', 'Delete Failed');
+      }
+    } catch (error) {
+      console.error('Error deleting event:', error);
+      showAlert('error', 'An unexpected error occurred', 'Delete Error');
+    } finally {
+      setDeleting(false);
+      handleHideDeleteModal();
+    }
+  };
+
   // Handle location press
   const handleLocationPress = () => {
     if (!event) return;
-    
-    // Open map app with location
+
     const mapUrl = Platform.select({
       ios: `maps:0,0?q=${encodeURIComponent(event.venue)}`,
       android: `geo:0,0?q=${encodeURIComponent(event.venue)}`,
     });
-    
+
     if (mapUrl) {
       Linking.openURL(mapUrl);
     }
   };
-  
+
   // Format date object from event if available
-  const formattedDateTime = event 
-    ? formatEventDate(event.startTime, event.endTime) 
+  const formattedDateTime = event
+    ? formatEventDate(event.startTime, event.endTime)
     : { date: '', time: '' };
-    
+
   // Determine if the event is upcoming and can be registered for
-  const canRegister = event?.status === 'upcoming' && !userRegistered && !isCreator;
-  
+  const canRegister = event?.status === 'UPCOMING' && !userRegistered && !isCreator;
+
+  // Render alert icon based on type
+  const renderAlertIcon = () => {
+    if (!alert) return null;
+
+    switch (alert.type) {
+      case 'error':
+        return <AlertCircleIcon size={24} color={colors.error} />;
+      case 'success':
+        return <CheckCircleIcon size={24} color={colors.success} />;
+      case 'info':
+        return <InfoIcon size={24} color={colors.info} />;
+      default:
+        return null;
+    }
+  };
+
+  // Get alert background color based on type
+  const getAlertBackgroundColor = () => {
+    if (!alert) return colors.card;
+
+    switch (alert.type) {
+      case 'error':
+        return theme === 'dark' ? '#3D1515' : '#FEE7E7';
+      case 'success':
+        return theme === 'dark' ? '#153D1A' : '#E7FEEA';
+      case 'info':
+        return theme === 'dark' ? '#15293D' : '#E7F2FE';
+      default:
+        return colors.card;
+    }
+  };
+
+  // Get alert text color based on type
+  const getAlertTextColor = () => {
+    if (!alert) return colors.text;
+
+    switch (alert.type) {
+      case 'error':
+        return theme === 'dark' ? '#FF9A9A' : '#D32F2F';
+      case 'success':
+        return theme === 'dark' ? '#9AFFAE' : '#2E7D32';
+      case 'info':
+        return theme === 'dark' ? '#9AC8FF' : '#1976D2';
+      default:
+        return colors.text;
+    }
+  };
+
   // Show loading skeleton if data is being fetched
   if (loading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
-        
-        {/* Header with back button */}
+
         <View style={[styles.header, { backgroundColor: colors.background, paddingTop: insets.top }]}>
-          <TouchableOpacity 
-            style={styles.backButton} 
-            onPress={() => navigation.goBack()}
-          >
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
             <BackIcon size={24} color={colors.text} />
           </TouchableOpacity>
         </View>
-        
-        {/* Loading skeleton */}
-        <ScrollView 
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-        >
+
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
           <Skeleton style={[styles.imageContainer, { height: moderateScale(220) }]} />
-          
+
           <View style={styles.contentContainer}>
             <Skeleton style={{ height: moderateScale(28), width: '80%', marginBottom: SPACING.md }} />
-            
+
             <View style={styles.metaContainer}>
               <Skeleton style={{ height: moderateScale(20), width: '60%', marginBottom: SPACING.sm }} />
               <Skeleton style={{ height: moderateScale(20), width: '50%', marginBottom: SPACING.sm }} />
               <Skeleton style={{ height: moderateScale(20), width: '40%', marginBottom: SPACING.lg }} />
             </View>
-            
+
             <Skeleton style={{ height: moderateScale(24), width: '40%', marginBottom: SPACING.sm }} />
             <Skeleton style={{ height: moderateScale(100), width: '100%', marginBottom: SPACING.lg }} />
-            
+
             <Skeleton style={{ height: moderateScale(24), width: '60%', marginBottom: SPACING.sm }} />
             <Skeleton style={{ height: moderateScale(60), width: '100%', marginBottom: SPACING.lg }} />
-            
+
             <Skeleton style={{ height: moderateScale(50), width: '100%', borderRadius: BORDER_RADIUS.md }} />
           </View>
         </ScrollView>
       </View>
     );
   }
-  
+
   // Show error message if event not found
   if (!event) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
-        
-        {/* Header with back button */}
+
         <View style={[styles.header, { backgroundColor: colors.background, paddingTop: insets.top }]}>
-          <TouchableOpacity 
-            style={styles.backButton} 
-            onPress={() => navigation.goBack()}
-          >
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
             <BackIcon size={24} color={colors.text} />
           </TouchableOpacity>
         </View>
-        
+
         <View style={styles.errorContainer}>
           <InfoIcon size={60} color={colors.error} />
           <Text variant="titleMedium" color={colors.text} style={styles.errorTitle}>
@@ -355,7 +444,7 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
           <Text variant="bodyMedium" color={colors.textSecondary} style={styles.errorMessage}>
             The event you're looking for doesn't exist or has been deleted.
           </Text>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.errorButton, { backgroundColor: colors.primary }]}
             onPress={() => navigation.goBack()}
           >
@@ -367,11 +456,64 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
       </View>
     );
   }
-  
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar style="light" />
-      
+
+      {/* In-screen alert */}
+      {alert && (
+        <Animated.View
+          style={[
+            styles.alertContainer,
+            {
+              backgroundColor: getAlertBackgroundColor(),
+              transform: [
+                {
+                  translateY: alertAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [-100, 0],
+                  }),
+                },
+                {
+                  scale: alertAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.9, 1],
+                  }),
+                },
+              ],
+              opacity: alertAnimation,
+              borderLeftWidth: 4,
+              borderLeftColor: getAlertTextColor(),
+            },
+          ]}
+        >
+          <View style={styles.alertContent}>
+            <View style={styles.alertIconContainer}>{renderAlertIcon()}</View>
+            <View style={styles.alertTextContainer}>
+              {alert.title && (
+                <Text
+                  variant="labelLarge"
+                  style={[styles.alertTitle, { color: getAlertTextColor() }]}
+                >
+                  {alert.title}
+                </Text>
+              )}
+              <Text variant="bodyMedium" style={{ color: colors.text }}>
+                {alert.message}
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={styles.alertCloseButton}
+            onPress={hideAlert}
+            hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+          >
+            <XIcon size={16} color={colors.textSecondary} />
+          </TouchableOpacity>
+        </Animated.View>
+      )}
+
       {/* Confetti animation on successful registration */}
       {showConfetti && (
         <ConfettiCannon
@@ -383,11 +525,11 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
           onAnimationEnd={() => setShowConfetti(false)}
         />
       )}
-      
+
       {/* Header with back button and actions */}
       <View style={[styles.header, { paddingTop: insets.top }]}>
-        <TouchableOpacity 
-          style={styles.backButton} 
+        <TouchableOpacity
+          style={styles.backButton}
           onPress={() => navigation.goBack()}
           hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
         >
@@ -395,9 +537,9 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
             <BackIcon size={20} color="white" />
           </View>
         </TouchableOpacity>
-        
+
         <View style={styles.actionButtons}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.actionButton}
             onPress={handleShare}
             hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
@@ -406,10 +548,10 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
               <ShareIcon size={18} color="white" />
             </View>
           </TouchableOpacity>
-          
+
           {isCreator && (
             <>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.actionButton}
                 onPress={handleEdit}
                 hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
@@ -418,10 +560,10 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
                   <EditIcon size={18} color="white" />
                 </View>
               </TouchableOpacity>
-              
-              <TouchableOpacity 
+
+              <TouchableOpacity
                 style={styles.actionButton}
-                onPress={handleDelete}
+                onPress={handleShowDeleteModal}
                 hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
               >
                 <View style={[styles.iconButton, { backgroundColor: 'rgba(0,0,0,0.3)' }]}>
@@ -432,39 +574,31 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
           )}
         </View>
       </View>
-      
-      <ScrollView 
+
+      <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         {/* Event image with gradient overlay */}
         <View style={styles.imageContainer}>
-          <Image 
-            source={{ uri: event.backgroundImage }} 
-            style={styles.eventImage} 
-            resizeMode="cover"
-          />
+          <Image source={{ uri: event.backgroundImage }} style={styles.eventImage} resizeMode="cover" />
           <LinearGradient
             colors={['transparent', 'rgba(0,0,0,0.7)']}
             style={styles.imageGradient}
           />
-          
-          {/* Event status badge */}
+
           <View style={styles.statusBadgeContainer}>
             <EventStatusBadge status={event.status} large />
           </View>
         </View>
-        
+
         <View style={[styles.contentContainer, { backgroundColor: colors.background }]}>
-          {/* Event title */}
           <Text variant="headingMedium" color={colors.text} style={styles.eventTitle}>
             {event.title}
           </Text>
-          
-          {/* Event meta information */}
+
           <View style={styles.metaContainer}>
-            {/* Date and time */}
             <View style={styles.metaItem}>
               <CalendarIcon size={20} color={colors.primary} />
               <View style={styles.metaTextContainer}>
@@ -476,8 +610,7 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
                 </Text>
               </View>
             </View>
-            
-            {/* Location */}
+
             <TouchableOpacity style={styles.metaItem} onPress={handleLocationPress}>
               <LocationPinIcon size={20} color={colors.primary} />
               <View style={styles.metaTextContainer}>
@@ -489,8 +622,7 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
                 </Text>
               </View>
             </TouchableOpacity>
-            
-            {/* Attendees */}
+
             <View style={styles.metaItem}>
               <PeopleIcon size={20} color={colors.primary} />
               <View style={styles.metaTextContainer}>
@@ -505,8 +637,7 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
               </View>
             </View>
           </View>
-          
-          {/* Event description */}
+
           <View style={styles.sectionContainer}>
             <Text variant="titleSmall" color={colors.text} style={styles.sectionTitle}>
               About
@@ -515,8 +646,7 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
               {event.description}
             </Text>
           </View>
-          
-          {/* Event terms and conditions */}
+
           <View style={styles.sectionContainer}>
             <Text variant="titleSmall" color={colors.text} style={styles.sectionTitle}>
               Terms & Conditions
@@ -525,8 +655,7 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
               {event.termsCondition}
             </Text>
           </View>
-          
-          {/* Event creator */}
+
           <View style={styles.sectionContainer}>
             <Text variant="titleSmall" color={colors.text} style={styles.sectionTitle}>
               Organizer
@@ -535,8 +664,7 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
               {isCreator ? 'You are the organizer of this event' : 'This event is organized by a campus member'}
             </Text>
           </View>
-          
-          {/* Attendees preview (if there are any) */}
+
           {registeredStudents.length > 0 && (
             <View style={styles.sectionContainer}>
               <View style={styles.sectionHeaderRow}>
@@ -551,8 +679,7 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
                   </TouchableOpacity>
                 )}
               </View>
-              
-              {/* Show first 3 attendees */}
+
               <View style={styles.attendeesContainer}>
                 {registeredStudents.slice(0, 3).map((student) => (
                   <View key={student._id} style={styles.attendeeItem}>
@@ -576,14 +703,10 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
               </View>
             </View>
           )}
-          
-          {/* Registration button */}
+
           {canRegister && (
             <TouchableOpacity
-              style={[
-                styles.registerButton,
-                { backgroundColor: colors.primary }
-              ]}
+              style={[styles.registerButton, { backgroundColor: colors.primary }]}
               onPress={handleRegister}
               disabled={registering}
             >
@@ -596,8 +719,7 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
               )}
             </TouchableOpacity>
           )}
-          
-          {/* Registered badge */}
+
           {userRegistered && !isCreator && (
             <View style={[styles.registeredBadge, { backgroundColor: `${colors.success}20` }]}>
               <Text variant="bodyMedium" color={colors.success} style={styles.registeredText}>
@@ -605,8 +727,7 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
               </Text>
             </View>
           )}
-          
-          {/* Creator badge */}
+
           {isCreator && (
             <View style={[styles.registeredBadge, { backgroundColor: `${colors.primary}20` }]}>
               <Text variant="bodyMedium" color={colors.primary} style={styles.registeredText}>
@@ -614,11 +735,82 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
               </Text>
             </View>
           )}
-          
-          {/* Bottom spacing */}
+
           <View style={styles.bottomSpacer} />
         </View>
       </ScrollView>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        visible={showDeleteModal}
+        transparent={true}
+        animationType="none"
+        onRequestClose={handleHideDeleteModal}
+      >
+        <BlurView intensity={Platform.OS === 'ios' ? 20 : 10} style={styles.modalOverlay}>
+          <Animated.View
+            style={[
+              styles.deleteModalContainer,
+              {
+                transform: [
+                  {
+                    scale: modalAnimation.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.9, 1],
+                    }),
+                  },
+                  {
+                    translateY: modalAnimation.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [50, 0],
+                    }),
+                  },
+                ],
+                opacity: modalAnimation,
+              },
+            ]}
+          >
+            <LinearGradient
+              colors={
+                theme === 'dark'
+                  ? ['#2A1A1A', '#1A0F0F']
+                  : ['#FEE7E7', '#FDD5D5']
+              }
+              style={styles.deleteModalGradient}
+            >
+              <View style={styles.deleteModalContent}>
+                <View style={styles.deleteModalIconContainer}>
+                  <AlertCircleIcon size={40} color={colors.error} />
+                </View>
+                <Text variant="titleMedium" color={colors.text} style={styles.deleteModalTitle}>
+                  Delete Event
+                </Text>
+                <Text variant="bodyMedium" color={colors.textSecondary} style={styles.deleteModalMessage}>
+                  Are you sure you want to delete this event? This action cannot be undone.
+                </Text>
+                <View style={styles.deleteModalButtons}>
+                  <Button
+                    title="Cancel"
+                    onPress={handleHideDeleteModal}
+                    variant="secondary"
+                    size="medium"
+                    style={styles.deleteModalButton}
+                  />
+                  <Button
+                    title="Delete"
+                    onPress={handleDelete}
+                    loading={deleting}
+                    disabled={deleting}
+                    variant="ghost"
+                    size="medium"
+                    style={styles.deleteModalButton}
+                  />
+                </View>
+              </View>
+            </LinearGradient>
+          </Animated.View>
+        </BlurView>
+      </Modal>
     </View>
   );
 };
@@ -784,6 +976,90 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.xl,
     borderRadius: BORDER_RADIUS.md,
+  },
+  // Alert styles
+  alertContainer: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 60 : 40,
+    left: SPACING.md,
+    right: SPACING.md,
+    padding: SPACING.md,
+    borderRadius: SPACING.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+    zIndex: 1001,
+  },
+  alertContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  alertIconContainer: {
+    marginRight: SPACING.sm,
+    paddingTop: 2,
+  },
+  alertTextContainer: {
+    flex: 1,
+  },
+  alertTitle: {
+    marginBottom: 2,
+    fontWeight: '600',
+  },
+  alertCloseButton: {
+    padding: SPACING.xs,
+    marginLeft: SPACING.xs,
+  },
+  // Delete modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deleteModalContainer: {
+    width: '85%',
+    maxWidth: 400,
+    borderRadius: BORDER_RADIUS.lg,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 10,
+  },
+  deleteModalGradient: {
+    flex: 1,
+    padding: SPACING.lg,
+  },
+  deleteModalContent: {
+    alignItems: 'center',
+  },
+  deleteModalIconContainer: {
+    marginBottom: SPACING.md,
+  },
+  deleteModalTitle: {
+    fontWeight: '600',
+    marginBottom: SPACING.sm,
+    textAlign: 'center',
+  },
+  deleteModalMessage: {
+    textAlign: 'center',
+    marginBottom: SPACING.xl,
+    lineHeight: 22,
+  },
+  deleteModalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  deleteModalButton: {
+    flex: 1,
+    marginHorizontal: SPACING.xs,
   },
 });
 

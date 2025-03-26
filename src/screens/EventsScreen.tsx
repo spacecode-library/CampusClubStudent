@@ -73,20 +73,20 @@ const EventsScreen: React.FC<EventsScreenProps> = ({ navigation }) => {
     try {
       // Fetch upcoming events
       const upcomingResponse = await ApiService.getEvents({
-        status: 'upcoming',
-        eventScope: 'university'
+        status: 'UPCOMING',
+        eventScope: 'PUBLIC'
       });
       
       // Fetch live events
       const liveResponse = await ApiService.getEvents({
-        status: 'live',
-        eventScope: 'university'
+        status: 'LIVE',
+        eventScope: 'PUBLIC'
       });
       
       // Fetch completed events
       const completedResponse = await ApiService.getEvents({
-        status: 'completed',
-        eventScope: 'university'
+        status: 'COMPLETED',
+        eventScope: 'PUBLIC'
       });
       
       if (upcomingResponse.success && upcomingResponse.data) {
@@ -171,7 +171,7 @@ const EventsScreen: React.FC<EventsScreenProps> = ({ navigation }) => {
   };
 
   // Handle see all press
-  const handleSeeAllPress = (status: 'upcoming' | 'live' | 'completed') => {
+  const handleSeeAllPress = (status: 'UPCOMING' | 'LIVE' | 'COMPLETED') => {
     navigation.navigate('EventsList', { status });
   };
 
@@ -456,7 +456,7 @@ const EventsScreen: React.FC<EventsScreenProps> = ({ navigation }) => {
                   <Text variant="titleSmall" color={colors.text}>Live Now</Text>
                   <View style={[styles.liveIndicator, { backgroundColor: colors.error }]} />
                 </View>
-                <TouchableOpacity onPress={() => handleSeeAllPress('live')}>
+                <TouchableOpacity onPress={() => handleSeeAllPress('LIVE')}>
                   <Text variant="labelMedium" color={colors.primary}>See All</Text>
                 </TouchableOpacity>
               </View>
@@ -486,7 +486,7 @@ const EventsScreen: React.FC<EventsScreenProps> = ({ navigation }) => {
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Text variant="titleSmall" color={colors.text}>Upcoming Events</Text>
-                <TouchableOpacity onPress={() => handleSeeAllPress('upcoming')}>
+                <TouchableOpacity onPress={() => handleSeeAllPress('UPCOMING')}>
                   <Text variant="labelMedium" color={colors.primary}>See All</Text>
                 </TouchableOpacity>
               </View>
@@ -516,7 +516,7 @@ const EventsScreen: React.FC<EventsScreenProps> = ({ navigation }) => {
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Text variant="titleSmall" color={colors.text}>Recent Events</Text>
-                <TouchableOpacity onPress={() => handleSeeAllPress('completed')}>
+                <TouchableOpacity onPress={() => handleSeeAllPress('COMPLETED')}>
                   <Text variant="labelMedium" color={colors.primary}>See All</Text>
                 </TouchableOpacity>
               </View>

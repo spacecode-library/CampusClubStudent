@@ -2,13 +2,11 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   StyleSheet,
-  TouchableOpacity,
   Animated,
   Easing,
   StatusBar,
   useWindowDimensions,
   Platform,
-  ImageBackground,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
@@ -30,8 +28,8 @@ import {
   useOrientation,
 } from '../utils/responsiveUtils';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import LogoSvg from '../components/LogoSvg';
+import { LinearGradient } from 'expo-linear-gradient';
 
 type OnboardingWelcomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'OnboardingWelcome'>;
 
@@ -153,7 +151,7 @@ const OnboardingWelcomeScreen: React.FC<OnboardingWelcomeScreenProps> = ({ navig
   ];
   
   // Calculate dynamic sizes
-  const logoSize = moderateScale(isTablet ? 64 : 48);
+  const logoSize = moderateScale(isTablet ? 100 : 80); // Increased logo size
   const stepNumberSize = moderateScale(isTablet ? 32 : 28);
   
   // Determine layout based on orientation and device size
@@ -177,6 +175,10 @@ const OnboardingWelcomeScreen: React.FC<OnboardingWelcomeScreenProps> = ({ navig
           }
         ]}
       >
+        <LinearGradient
+          colors={['#1E1E3A', '#2A2A50']} // Premium gradient background
+          style={StyleSheet.absoluteFillObject}
+        />
       </Animated.View>
       
       {/* Main content */}
@@ -200,23 +202,23 @@ const OnboardingWelcomeScreen: React.FC<OnboardingWelcomeScreenProps> = ({ navig
             }
           ]}
         >
-            <View 
-              style={[
-                styles.logo,
-                {
-                  backgroundColor: colors.primary,
-                  width: logoSize,
-                  height: logoSize,
-                  borderRadius: logoSize / 2,
-                }
-              ]}
-            >
-              <LogoSvg
-                width={logoSize * 0.6}
-                height={logoSize * 0.6}
-                fill={colors.buttonText}
-              />
-            </View>
+          <View 
+            style={[
+              styles.logo,
+              {
+                backgroundColor: colors.primary,
+                width: logoSize + 5,
+                height: logoSize + 5,
+                borderRadius: logoSize / 2,
+              }
+            ]}
+          >
+            <LogoSvg
+              width={logoSize * 1.1}
+              height={logoSize * 1.1}
+              fill={colors.buttonText}
+            />
+          </View>
         </Animated.View>
         
         {/* Welcome Content */}
@@ -234,7 +236,8 @@ const OnboardingWelcomeScreen: React.FC<OnboardingWelcomeScreenProps> = ({ navig
             color="#FFFFFF" 
             style={[
               styles.welcomeTitle,
-              isLandscapeTablet && { textAlign: 'left' }
+              isLandscapeTablet && { textAlign: 'left' },
+              { lineHeight: verticalScale(40) } // Improved readability
             ]}
           >
             Welcome to CampusClub!
@@ -245,7 +248,8 @@ const OnboardingWelcomeScreen: React.FC<OnboardingWelcomeScreenProps> = ({ navig
             color="rgba(255, 255, 255, 0.9)" 
             style={[
               styles.welcomeText,
-              isLandscapeTablet && { textAlign: 'left' }
+              isLandscapeTablet && { textAlign: 'left' },
+              { lineHeight: verticalScale(24) } // Enhanced spacing
             ]}
           >
             Exclusive student discounts at your fingertips.
@@ -304,7 +308,7 @@ const OnboardingWelcomeScreen: React.FC<OnboardingWelcomeScreenProps> = ({ navig
                   </View>
                   
                   <View style={styles.stepContent}>
-                    <Text variant="labelLarge" color="#FFFFFF" style={styles.stepTitle}>
+                    <Text variant="labelLarge" color={colors.primary} style={styles.stepTitle}>
                       {step.title}
                     </Text>
                     <Text variant="bodySmall" color="rgba(255, 255, 255, 0.9)">
@@ -352,14 +356,6 @@ const styles = StyleSheet.create({
   backgroundContainer: {
     ...StyleSheet.absoluteFillObject,
   },
-  backgroundImage: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
-  },
-  gradientOverlay: {
-    ...StyleSheet.absoluteFillObject,
-  },
   contentContainer: {
     flex: 1,
     justifyContent: 'space-between',
@@ -368,19 +364,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: verticalScale(20),
   },
-  logoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
   logo: {
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: horizontalScale(12),
-  },
-  appName: {
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 3,
   },
   welcomeContainer: {
     flex: 1,
@@ -389,9 +376,9 @@ const styles = StyleSheet.create({
   welcomeTitle: {
     textAlign: 'center',
     marginBottom: verticalScale(8),
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowColor: 'rgba(0, 0, 0, 0.4)', // Enhanced shadow
     textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 3,
+    textShadowRadius: 4,
   },
   welcomeText: {
     textAlign: 'center',
@@ -417,6 +404,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: BORDER_RADIUS.lg,
     padding: SPACING.md,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 6,
+      },
+    }),
   },
   stepHeader: {
     flexDirection: 'row',
@@ -427,6 +425,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: horizontalScale(12),
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.2,
+        shadowRadius: 2,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
   },
   stepIconContainer: {
     justifyContent: 'center',

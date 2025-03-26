@@ -117,8 +117,8 @@ export interface Event {
   backgroundImage: string;
   termsCondition: string;
   venue: string;
-  eventScope: 'university' | 'public';
-  status: 'upcoming' | 'live' | 'completed';
+  eventScope: 'UNIVERSITY' | 'PUBLIC';
+  status: 'UPCOMING' | 'LIVE' | 'COMPLETED';
   isDeleted: boolean;
   createdAt: string;
   updatedAt: string;
@@ -137,6 +137,11 @@ export interface RegisteredStudent {
   _id: string;
   name: string;
   email: string;
+}
+
+export interface RedeemDiscountResponse {
+  redemptionCode: string;
+  redemptionDate: string;
 }
 
 class ApiService {
@@ -165,6 +170,8 @@ class ApiService {
     };
   }
 
+
+  
 
 // Get redemption history for a student
 static async getRedemptionHistory(studentId: string): Promise<ApiResponse<Redemption[]>> {
@@ -271,7 +278,6 @@ static async getStudentId(): Promise<string> {
     };
   }
 
-  // Generic fetch method with error handling and token refresh
   private static async fetchData<T>(
     endpoint: string,
     method: 'GET' | 'POST' | 'PUT' | 'DELETE',
@@ -289,81 +295,39 @@ static async getStudentId(): Promise<string> {
         body: body ? JSON.stringify(body) : undefined,
       });
       
-      // Check if response is ok before trying to parse JSON
+      // Handle redirects (e.g., 301 for subscription redirect)
+      if (response.status === 301) {
+        const redirectUrl = response.headers.get('location');
+        if (redirectUrl?.includes('/subscription')) {
+          return {
+            success: false,
+            message: 'Premium subscription required to redeem this discount',
+            data: { redirectTo: 'subscription' } as any, // Add a custom field to handle navigation
+          };
+        }
+      }
+      
+      const data = await response.json();
+      
       if (!response.ok) {
-        // Check for 401 - Unauthorized error
+        // Handle token refresh if 401
         if (response.status === 401 && requiresAuth) {
           const refreshed = await this.refreshToken();
           if (refreshed) {
             // Retry the request
             return this.fetchData(endpoint, method, body, requiresAuth);
           }
-          // If refresh failed, return appropriate error
-          return {
-            success: false,
-            message: 'Authentication failed. Please log in again.',
-          };
         }
         
-        // For other error status codes
-// Inside fetchData, modify the catch block for parsing errors:
-try {
-  const errorText = await response.text(); // Get the raw response text
-  console.error('Raw server response:', errorText.substring(0, 200)); // Log first 200 chars to see what's coming back
-  
-  // Try to parse it as JSON (this will likely fail)
-            try {
-              const errorData = JSON.parse(errorText);
-              return {
-                success: false,
-                message: Array.isArray(errorData.message) ? errorData.message[0] : errorData.message,
-              };
-            } catch (jsonError) {
-              // If it contains HTML, it's likely a server error page
-              if (errorText.includes('<!DOCTYPE html>') || errorText.includes('<html')) {
-                console.error('Server returned HTML instead of JSON - likely a server error page');
-                return {
-                  success: false,
-                  message: 'Server error: API returned an HTML page instead of JSON',
-                };
-              }
-              return {
-                success: false,
-                message: `Server error: ${response.status} ${response.statusText}`,
-              };
-            }
-          } catch (textError) {
-            console.error('Error reading response body:', textError);
-            return {
-              success: false,
-              message: `Server error: ${response.status} ${response.statusText}`,
-            };
-          }
-      }
-      
-      // Safely parse the JSON response
-      try {
-        const data = await response.json();
-        return data as ApiResponse<T>;
-      } catch (parseError) {
-        console.error('Error parsing JSON response:', parseError);
         return {
           success: false,
-          message: 'Failed to parse server response. The server may be returning invalid JSON.',
+          message: Array.isArray(data.message) ? data.message[0] : data.message || 'An error occurred',
         };
       }
       
+      return data as ApiResponse<T>;
     } catch (error: any) {
       console.error('API Error:', error);
-      
-      // Check if it's a network error
-      if (error.message && error.message.includes('Network request failed')) {
-        return {
-          success: false,
-          message: 'Network error. Please check your internet connection.',
-        };
-      }
-      
       return {
         success: false,
         message: error.message || 'An unexpected error occurred',
@@ -420,14 +384,17 @@ try {
   
   // Verify OTP for registration
   static async verifyRegistrationOtp(requestId: string, otp: string): Promise<ApiResponse<AuthResponse>> {
+   
+    console.log('requestId', requestId);
+
     const response = await this.fetchData<AuthResponse>(
       '/user/verify-otp',
       'POST',
       { requestId, otp },
       false
     );
-    
-    if (response.success && response.data) {
+
+    if ( response.data) {
       // Store tokens
       await AsyncStorage.setItem(TOKEN_KEY, response.data.token);
       await AsyncStorage.setItem(REFRESH_TOKEN_KEY, response.data.refreshToken);
@@ -644,6 +611,7 @@ try {
         body: file,
       });
       
+
       // Handle non-JSON responses
       if (!response.ok) {
         try {
@@ -731,15 +699,17 @@ try {
     );
   }
   
-  // Redeem a discount
-  static async redeemDiscount(discountId: string): Promise<ApiResponse<{redeemCode: string}>> {
-    return this.fetchData<{redeemCode: string}>(
-      `/discounts/${discountId}/redeem`,
-      'POST',
-      undefined,
-      true
-    );
-  }
+
+static async redeemDiscount(discountId: string): Promise<ApiResponse<RedeemDiscountResponse>> {
+  const studentId = await this.getStudentId();
+
+  return this.fetchData<RedeemDiscountResponse>(
+    '/redeem-discount',
+    'POST',
+    { studentId, discountId },
+    true
+  );
+}
   
   // Get user's redeemed discounts
   static async getRedeemedDiscounts(): Promise<ApiResponse<Discount[]>> {
@@ -752,6 +722,32 @@ try {
   }
 
 
+// Create a payment order
+static async createPaymentOrder(): Promise<ApiResponse<{ order: any }>> {
+  return this.fetchData<{ order: any }>(
+    '/payment/checkout',
+    'POST',
+    undefined,
+    true
+  );
+}
+
+// Verify the payment
+static async verifyPayment(paymentData: {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+}): Promise<ApiResponse<any>> {
+  return this.fetchData<any>(
+    '/payment/verify',
+    'POST',
+    paymentData,
+    true
+  );
+}
+
+
+
 // Create a new event
 static async createEvent(eventData: {
   title: string;
@@ -761,7 +757,7 @@ static async createEvent(eventData: {
   backgroundImage: string;
   termsCondition: string;
   venue: string;
-  eventScope: 'university' | 'public';
+  eventScope: 'UNIVERSITY' | 'PUBLIC';
 }): Promise<ApiResponse<Event>> {
   return this.fetchData<Event>(
     '/event/create',
@@ -773,9 +769,10 @@ static async createEvent(eventData: {
 
 // Get events based on status and scope
 static async getEvents(filters: {
-  status: 'upcoming' | 'live' | 'completed';
-  eventScope: 'university' | 'public';
+  status: 'UPCOMING' | 'LIVE' | 'COMPLETED';
+  eventScope: 'UNIVERSITY' | 'PUBLIC';
 }): Promise<ApiResponse<Event[]>> {
+  console.log('Here:',AsyncStorage.getItem(TOKEN_KEY));
   return this.fetchData<Event[]>(
     '/event',
     'POST',
@@ -825,7 +822,7 @@ static async editEvent(
     backgroundImage: string;
     termsCondition: string;
     venue: string;
-    eventScope: 'university' | 'public';
+    eventScope: 'UNIVERSITY' | 'PUBLIC';
   }>
 ): Promise<ApiResponse<Event>> {
   return this.fetchData<Event>(

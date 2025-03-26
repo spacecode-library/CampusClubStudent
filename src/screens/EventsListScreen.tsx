@@ -52,9 +52,9 @@ const EventsListScreen: React.FC<EventsListScreenProps> = ({ navigation, route }
   
   // Status title mapping
   const statusTitles: Record<string, string> = {
-    'upcoming': 'Upcoming Events',
-    'live': 'Live Events',
-    'completed': 'Past Events'
+    'UPCOMING': 'Upcoming Events',
+    'LIVE': 'Live Events',
+    'COMPLETED': 'Past Events'
   };
   
   // Fetch events on mount
@@ -69,7 +69,7 @@ const EventsListScreen: React.FC<EventsListScreenProps> = ({ navigation, route }
     try {
       const response = await ApiService.getEvents({
         status: status,
-        eventScope: 'university'
+        eventScope: 'UNIVERSITY'
       });
       
       if (response.success && response.data) {
@@ -218,9 +218,9 @@ const EventsListScreen: React.FC<EventsListScreenProps> = ({ navigation, route }
         No {status} events
       </Text>
       <Text variant="bodyMedium" color={colors.textSecondary} style={styles.emptyDescription}>
-        {status === 'upcoming' 
+        {status === 'UPCOMING' 
           ? 'There are no upcoming events scheduled yet. Check back later or create your own event!'
-          : status === 'live'
+          : status === 'LIVE'
           ? 'There are no live events happening right now. Check back later!'
           : 'There are no past events to display.'}
       </Text>

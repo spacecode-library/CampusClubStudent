@@ -18,7 +18,6 @@ import ExploreScreen from './src/screens/ExploreScreen';
 import EventsScreen from './src/screens/EventsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import DiscountDetailsScreen from './src/screens/DiscountDetailsScreen';
-import SubscriptionScreen from './src/screens/SubscriptionScreen';
 import MerchantProfileScreen from './src/screens/MerchantProfileScreen';
 import RedemptionSuccessScreen from './src/screens/RedemptionSuccessScreen';
 import ActiveRedemptionsScreen from './src/screens/ActiveRedemptionsScreen';
@@ -87,7 +86,7 @@ export type RootStackParamList = {
   EventDetails: { eventId: string };
   CreateEvent: undefined;
   EditEvent: { eventId: string };
-  EventsList: { status: 'upcoming' | 'live' | 'completed' };
+  EventsList: { status: 'UPCOMING' | 'LIVE' | 'COMPLETED' };
   EventAttendees: { eventId: string };
   // Individual tab screens (needed for type safety)
   Home: undefined;
@@ -284,6 +283,9 @@ const App = () => {
   
   // Only change route if we're actually logged in
   if (isLoggedIn) {
+
+    
+
     if (!isOnboardingCompleted) {
       initialRoute = 'OnboardingWelcome';
     } else if (!isVerified) {
@@ -323,7 +325,7 @@ const App = () => {
           {/* Main Application */}
           <Stack.Screen name="MainTabs" component={MainTabNavigator} />
           <Stack.Screen name="DiscountDetails" component={DiscountDetailsScreen} />
-          <Stack.Screen name="Subscription" component={SubscriptionScreen} />
+          <Stack.Screen name="Subscription" component={MainTabNavigator} />
           <Stack.Screen name="MerchantProfile" component={MerchantProfileScreen} />
           <Stack.Screen name="RedemptionSuccess" component={RedemptionSuccessScreen} />
           <Stack.Screen name="ActiveRedemptions" component={ActiveRedemptionsScreen} />

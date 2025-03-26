@@ -70,18 +70,18 @@ const EventAttendeesScreen: React.FC<EventAttendeesScreenProps> = ({ navigation,
     try {
       // Fetch events from all statuses to find the specific event
       const upcomingResponse = await ApiService.getEvents({
-        status: 'upcoming',
-        eventScope: 'university'
+        status: 'UPCOMING',
+        eventScope: 'UNIVERSITY'
       });
       
       const liveResponse = await ApiService.getEvents({
-        status: 'live',
-        eventScope: 'university'
+        status: 'LIVE',
+        eventScope: 'UNIVERSITY'
       });
       
       const completedResponse = await ApiService.getEvents({
-        status: 'completed',
-        eventScope: 'university'
+        status: 'COMPLETED',
+        eventScope: 'UNIVERSITY'
       });
       
       // Combine all events and find the one with matching ID

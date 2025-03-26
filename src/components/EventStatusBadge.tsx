@@ -6,7 +6,7 @@ import Text from './Text';
 import { moderateScale } from '../utils/responsiveUtils';
 
 interface EventStatusBadgeProps {
-  status: 'upcoming' | 'live' | 'completed';
+  status: 'UPCOMING' | 'LIVE' | 'COMPLETED';
   large?: boolean;
 }
 
@@ -16,19 +16,19 @@ const EventStatusBadge: React.FC<EventStatusBadgeProps> = ({ status, large = fal
   // Determine badge styling based on status
   const getStatusStyles = () => {
     switch (status) {
-      case 'upcoming':
+      case 'UPCOMING':
         return {
           backgroundColor: `${colors.primary}20`,
           textColor: colors.primary,
           label: 'Upcoming'
         };
-      case 'live':
+      case 'LIVE':
         return {
           backgroundColor: `${colors.error}20`,
           textColor: colors.error,
           label: 'Live Now'
         };
-      case 'completed':
+      case 'COMPLETED':
         return {
           backgroundColor: `${colors.textSecondary}20`,
           textColor: colors.textSecondary,
@@ -51,7 +51,7 @@ const EventStatusBadge: React.FC<EventStatusBadgeProps> = ({ status, large = fal
       { backgroundColor: statusStyles.backgroundColor },
       large && styles.largeBadge
     ]}>
-      {status === 'live' && (
+      {status === 'LIVE' && (
         <View style={[styles.liveIndicator, { backgroundColor: colors.error }]} />
       )}
       <Text 

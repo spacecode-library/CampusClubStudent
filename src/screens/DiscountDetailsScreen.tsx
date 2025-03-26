@@ -9,7 +9,6 @@ import {
   Image,
   ImageBackground,
   Share,
-  Alert,
   Linking,
   Platform,
   Dimensions,
@@ -28,16 +27,19 @@ import * as Haptics from 'expo-haptics';
 import { DiscountData } from '../components/DiscountCard';
 import { SharedElement } from '../components/mocks/SharedElement';
 import { MotiView } from 'moti';
-import LottieView from 'lottie-react-native';
 import ApiService from '../services/ApiService';
 
 // Import icons
-import { 
-  ArrowLeftIcon, 
-  ShareIcon, 
-  CalendarIcon, 
-  LocationPinIcon, 
+import {
+  ArrowLeftIcon,
+  ShareIcon,
+  CalendarIcon,
+  LocationPinIcon,
   TagIcon,
+  AlertCircleIcon,
+  XIcon,
+  InfoIcon,
+  CheckCircleIcon,
 } from '../components/icons';
 
 type DiscountDetailsScreenNavigationProp = StackNavigationProp<RootStackParamList, 'DiscountDetails'>;
@@ -48,30 +50,19 @@ interface DiscountDetailsScreenProps {
   route: DiscountDetailsScreenRouteProp;
 }
 
+// Alert types for in-screen alerts
+type AlertType = 'error' | 'success' | 'info' | null;
+
+interface AlertData {
+  type: AlertType;
+  message: string;
+  title?: string;
+}
+
 // Create a custom type that extends React.FC with a sharedElements property
 interface SharedElementScreenComponent<P = {}> extends React.FC<P> {
   sharedElements?: (props: any) => string[];
 }
-
-// Example mock discount for preview
-const mockDiscount: DiscountData = {
-  _id: '67b75673d8a1592a4e104bdc',
-  merchantId: '67b5efc14650d7cf215cd22a',
-  merchantCity: 'Kuala Lumpur',
-  merchantCountry: 'Malaysia',
-  title: 'Red Chief 50% Off',
-  description: 'Get 50% off on all shoes at Red Chief stores. Valid for all students with valid student ID. Cannot be combined with other offers or promotions. Limited time offer, while supplies last.',
-  discountType: 'OFFLINE',
-  discountpercentage: 50,
-  startprice: 2000,
-  remainingUses: 100,
-  endDate: '2025-06-20T16:21:07.979+00:00',
-  isOpenAll: true,
-  status: 'ACTIVE',
-  merchantName: 'Red Chief',
-  merchantLogo: 'https://logo.clearbit.com/redchief.com',
-  backgroundImage: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=1470&auto=format&fit=crop'
-};
 
 // To be used for terms and conditions sections
 const termsAndConditions = [
@@ -85,88 +76,123 @@ const termsAndConditions = [
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-const DiscountDetailsScreen: SharedElementScreenComponent<DiscountDetailsScreenProps> = ({ navigation, route }) => {
+const DiscountDetailsScreen: SharedElementScreenComponent<DiscountDetailsScreenProps> = ({
+  navigation,
+  route,
+}) => {
   const { colors, theme } = useTheme();
   const insets = useSafeAreaInsets();
-  
+
   // Animation refs
   const scrollY = useRef(new Animated.Value(0)).current;
-  const successAnimationRef = useRef<LottieView>(null);
-  
+  const alertAnimation = useRef(new Animated.Value(0)).current;
+
   // State
   const [discount, setDiscount] = useState<DiscountData | null>(null);
   const [loading, setLoading] = useState(true);
   const [redeemLoading, setRedeemLoading] = useState(false);
   const [isRedeemed, setIsRedeemed] = useState(false);
   const [redeemCode, setRedeemCode] = useState<string | null>(null);
-  
+  const [alert, setAlert] = useState<AlertData | null>(null);
+
+  // Show in-screen alert
+  const showAlert = (type: AlertType, message: string, title?: string, duration = 5000) => {
+    setAlert({ type, message, title });
+
+    // Animate alert in
+    Animated.spring(alertAnimation, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 80,
+      friction: 8,
+    }).start();
+
+    // Auto-hide after duration
+    if (duration > 0) {
+      setTimeout(() => {
+        hideAlert();
+      }, duration);
+    }
+  };
+
+  // Hide in-screen alert
+  const hideAlert = () => {
+    Animated.timing(alertAnimation, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setAlert(null);
+    });
+  };
+
   // Animation interpolations
   const headerOpacity = scrollY.interpolate({
     inputRange: [0, 100, 150],
     outputRange: [0, 0.85, 1],
-    extrapolate: 'clamp'
+    extrapolate: 'clamp',
   });
-  
+
   const headerTitleOpacity = scrollY.interpolate({
     inputRange: [0, 150, 200],
     outputRange: [0, 0.7, 1],
-    extrapolate: 'clamp'
+    extrapolate: 'clamp',
   });
-  
+
   const heroScale = scrollY.interpolate({
     inputRange: [-200, 0, 200],
     outputRange: [1.2, 1, 0.8],
-    extrapolate: 'clamp'
+    extrapolate: 'clamp',
   });
-  
+
   const heroOpacity = scrollY.interpolate({
     inputRange: [0, 200],
     outputRange: [1, 0],
-    extrapolate: 'clamp'
+    extrapolate: 'clamp',
   });
-  
+
   // Fetch discount details
   useEffect(() => {
     const fetchDiscountData = async () => {
       try {
         setLoading(true);
-        
+
         if (!route.params?.discountId) {
           throw new Error('Discount ID is required');
         }
 
-        // Try to fetch from API using route.params.discountId
+        // Fetch from API using route.params.discountId
         const response = await ApiService.getDiscountById(route.params.discountId);
-        
+
         if (response.success && response.data) {
           setDiscount(response.data);
         } else {
-          // If API call fails, use mock data with simulated delay for demo
-          await new Promise(resolve => setTimeout(resolve, 500));
-          setDiscount(mockDiscount);
+          throw new Error(
+            Array.isArray(response.message) ? response.message[0] : response.message || 'Failed to fetch discount'
+          );
         }
       } catch (error) {
         console.error('Error fetching discount details:', error);
-        // Fallback to mock data
-        setDiscount(mockDiscount);
+        showAlert('error', 'Failed to load discount details. Please try again.', 'Error');
+        setDiscount(null); // Ensure discount is null to trigger error state
       } finally {
         setLoading(false);
       }
     };
-    
+
     fetchDiscountData();
   }, [route.params?.discountId]);
-  
+
   // Format end date
   const formatEndDate = (dateString: string | Date) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
+    return date.toLocaleDateString('en-US', {
       year: 'numeric',
-      month: 'long', 
-      day: 'numeric' 
+      month: 'long',
+      day: 'numeric',
     });
   };
-  
+
   // Calculate days remaining until expiration
   const getDaysRemaining = (dateString: string | Date) => {
     const today = new Date();
@@ -184,97 +210,144 @@ const DiscountDetailsScreen: SharedElementScreenComponent<DiscountDetailsScreenP
   // Handle share button press
   const handleSharePress = async () => {
     if (!discount) return;
-    
+
     try {
       if (Platform.OS === 'ios') {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
-      
+
       await Share.share({
         title: `${discount.title} - ${discount.discountpercentage}% off`,
         message: `Check out this discount on CampusClub: ${discount.title} - ${discount.discountpercentage}% off at ${discount.merchantName}!`,
       });
     } catch (error) {
-      console.log('Error sharing:', error);
+      console.error('Error sharing:', error);
+      showAlert('error', 'Failed to share the discount. Please try again.', 'Error');
     }
   };
 
   // Handle merchant profile
   const handleViewMerchant = () => {
     if (!discount) return;
-    
+
     if (Platform.OS === 'ios') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-    
+
     navigation.navigate('MerchantProfile', { merchantId: discount.merchantId });
   };
 
-  // Handle redeem button press
-  const handleRedeemPress = async () => {
-    if (!discount) return;
-    
-    if (Platform.OS === 'ios') {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
-    
-    setRedeemLoading(true);
-    
-    try {
-      // Try to call the API in a real app
-      const response = await ApiService.redeemDiscount(discount._id);
-      
-      // If API call fails, simulate for demo purposes
-      if (!response.success) {
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        
-        // Generate a random code for demo
-        const code = 'CC' + Math.floor(1000000 + Math.random() * 9000000).toString();
-        setRedeemCode(code);
-        setIsRedeemed(true);
-        
-        if (successAnimationRef.current) {
-          successAnimationRef.current.play();
-        }
-        
-        navigation.navigate('RedemptionSuccess', {
-          redemptionId: `demo-${Date.now()}`,
-          discountTitle: discount.title,
-          discountPercentage: discount.discountpercentage,
-          merchantName: discount.merchantName,
-          merchantLogo: discount.merchantLogo,
-          redemptionCode: code,
-          isOnline: discount.discountType === 'ONLINE',
-          storeLink: discount.storeLink,
-          expirationDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-        });
-      } else if (response.data && response.data.redeemCode) {
-        setRedeemCode(response.data.redeemCode);
-        setIsRedeemed(true);
-        
-        navigation.navigate('RedemptionSuccess', {
-          redemptionId: `api-${Date.now()}`,
-          discountTitle: discount.title,
-          discountPercentage: discount.discountpercentage,
-          merchantName: discount.merchantName,
-          merchantLogo: discount.merchantLogo,
-          redemptionCode: response.data.redeemCode,
-          isOnline: discount.discountType === 'ONLINE',
-          storeLink: discount.storeLink,
-          expirationDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-        });
+// Handle redeem button press
+const handleRedeemPress = async () => {
+  if (!discount) return;
+
+  if (Platform.OS === 'ios') {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }
+
+  setRedeemLoading(true);
+
+  try {
+    // Call the API to redeem the discount
+    const response = await ApiService.redeemDiscount(discount._id);
+
+    if (response.success && response.data) {
+      // Check for redirect data
+      if ('redirectTo' in response.data && response.data.redirectTo === 'subscription') {
+        showAlert('info', 'A premium subscription is required to redeem this discount.', 'Subscription Required');
+        setTimeout(() => {
+          navigation.navigate('Subscription'); // Replace with your actual subscription screen route
+        }, 1500);
+        return;
       }
-    } catch (error) {
-      console.error('Error redeeming discount:', error);
-      Alert.alert('Redemption Failed', 'An error occurred while redeeming this discount. Please try again later.');
-    } finally {
-      setRedeemLoading(false);
+    
+      const { redemptionCode } = response.data;
+      if (redemptionCode) {
+        setRedeemCode(redemptionCode);
+        setIsRedeemed(true);
+    
+        showAlert('success', 'Discount redeemed successfully!', 'Success', 1500);
+        setTimeout(() => {
+          navigation.navigate('RedemptionSuccess', {
+            redemptionId: `api-${Date.now()}`,
+            discountTitle: discount.title,
+            discountPercentage: discount.discountpercentage,
+            merchantName: discount.merchantName,
+            merchantLogo: discount.merchantLogo,
+            redemptionCode: redemptionCode,
+            isOnline: discount.discountType === 'ONLINE',
+            storeLink: discount.storeLink,
+            expirationDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          });
+        }, 1500);
+      } else {
+        throw new Error('Redemption code not provided in response');
+      }
+    } else {
+      throw new Error(
+        Array.isArray(response.message) ? response.message[0] : response.message || 'Failed to redeem discount'
+      );
+    } 
+    
+  } catch (error) {
+    console.error('Error redeeming discount:', error);
+    showAlert('error', 'An error occurred while redeeming this discount. Please try again later.', 'Redemption Failed');
+  } finally {
+    setRedeemLoading(false);
+  }
+};
+
+  const isOnline = discount?.discountType === 'ONLINE';
+
+  // Render alert icon based on type
+  const renderAlertIcon = () => {
+    if (!alert) return null;
+
+    switch (alert.type) {
+      case 'error':
+        return <AlertCircleIcon size={24} color={colors.error} />;
+      case 'success':
+        return <CheckCircleIcon size={24} color={colors.success} />;
+      case 'info':
+        return <InfoIcon size={24} color={colors.info} />;
+      default:
+        return null;
     }
   };
-  
-  const isOnline = discount?.discountType === 'ONLINE';
-  
-  if (loading || !discount) {
+
+  // Get alert background color based on type
+  const getAlertBackgroundColor = () => {
+    if (!alert) return colors.card;
+
+    switch (alert.type) {
+      case 'error':
+        return theme === 'dark' ? '#3D1515' : '#FEE7E7';
+      case 'success':
+        return theme === 'dark' ? '#153D1A' : '#E7FEEA';
+      case 'info':
+        return theme === 'dark' ? '#15293D' : '#E7F2FE';
+      default:
+        return colors.card;
+    }
+  };
+
+  // Get alert text color based on type
+  const getAlertTextColor = () => {
+    if (!alert) return colors.text;
+
+    switch (alert.type) {
+      case 'error':
+        return theme === 'dark' ? '#FF9A9A' : '#D32F2F';
+      case 'success':
+        return theme === 'dark' ? '#9AFFAE' : '#2E7D32';
+      case 'info':
+        return theme === 'dark' ? '#9AC8FF' : '#1976D2';
+      default:
+        return colors.text;
+    }
+  };
+
+  if (loading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
         <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
@@ -285,35 +358,109 @@ const DiscountDetailsScreen: SharedElementScreenComponent<DiscountDetailsScreenP
     );
   }
 
+  if (!discount) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+        <View style={styles.loadingContent}>
+          <Text variant="headingMedium" color={colors.text} style={{ marginBottom: SPACING.md }}>
+            Error
+          </Text>
+          <Text variant="bodyMedium" color={colors.textSecondary}>
+            Failed to load discount details. Please try again later.
+          </Text>
+          <Button
+            title="Go Back"
+            onPress={handleBackPress}
+            style={{ marginTop: SPACING.lg }}
+          />
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-      
+
+      {/* In-screen alert */}
+      {alert && (
+        <Animated.View
+          style={[
+            styles.alertContainer,
+            {
+              backgroundColor: getAlertBackgroundColor(),
+              transform: [
+                {
+                  translateY: alertAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [-100, 0],
+                  }),
+                },
+                {
+                  scale: alertAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.9, 1],
+                  }),
+                },
+              ],
+              opacity: alertAnimation,
+              borderLeftWidth: 4,
+              borderLeftColor: getAlertTextColor(),
+            },
+          ]}
+        >
+          <View style={styles.alertContent}>
+            <View style={styles.alertIconContainer}>{renderAlertIcon()}</View>
+            <View style={styles.alertTextContainer}>
+              {alert.title && (
+                <Text
+                  variant="labelLarge"
+                  style={[styles.alertTitle, { color: getAlertTextColor() }]}
+                >
+                  {alert.title}
+                </Text>
+              )}
+              <Text variant="bodyMedium" style={{ color: colors.text }}>
+                {alert.message}
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={styles.alertCloseButton}
+            onPress={hideAlert}
+            hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+          >
+            <XIcon size={16} color={colors.textSecondary} />
+          </TouchableOpacity>
+        </Animated.View>
+      )}
+
       {/* Animated header */}
-      <Animated.View 
+      <Animated.View
         style={[
           styles.animatedHeader,
-          { backgroundColor: colors.background, opacity: headerOpacity, height: insets.top + 60, paddingTop: insets.top }
+          { backgroundColor: colors.background, opacity: headerOpacity, height: insets.top + 60, paddingTop: insets.top },
         ]}
       >
         <View style={styles.headerContent}>
           <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
             <ArrowLeftIcon size={24} color={colors.text} />
           </TouchableOpacity>
-          
+
           <Animated.Text
             style={[styles.headerTitle, { color: colors.text, opacity: headerTitleOpacity }]}
             numberOfLines={1}
           >
             {discount.title}
           </Animated.Text>
-          
+
           <TouchableOpacity style={styles.shareButton} onPress={handleSharePress}>
             <ShareIcon size={22} color={colors.text} />
           </TouchableOpacity>
         </View>
       </Animated.View>
-      
+
       {/* Scrollable content */}
       <Animated.ScrollView
         style={styles.scrollView}
@@ -335,7 +482,7 @@ const DiscountDetailsScreen: SharedElementScreenComponent<DiscountDetailsScreenP
                       <ShareIcon size={20} color="#FFFFFF" />
                     </TouchableOpacity>
                   </View>
-                  
+
                   <View style={styles.discountBadgeContainer}>
                     <MotiView
                       style={[styles.discountBadge, { backgroundColor: colors.primary }]}
@@ -351,12 +498,12 @@ const DiscountDetailsScreen: SharedElementScreenComponent<DiscountDetailsScreenP
                       </Text>
                     </MotiView>
                   </View>
-                  
+
                   {discount.merchantLogo && (
                     <TouchableOpacity onPress={handleViewMerchant} activeOpacity={0.9}>
-                      <Image 
-                        source={{ uri: discount.merchantLogo }} 
-                        style={[styles.merchantLogo, { borderColor: 'rgba(255,255,255,0.2)' }]} 
+                      <Image
+                        source={{ uri: discount.merchantLogo }}
+                        style={[styles.merchantLogo, { borderColor: 'rgba(255,255,255,0.2)' }]}
                       />
                     </TouchableOpacity>
                   )}
@@ -365,7 +512,7 @@ const DiscountDetailsScreen: SharedElementScreenComponent<DiscountDetailsScreenP
             </ImageBackground>
           </Animated.View>
         </SharedElement>
-        
+
         {/* Content Section */}
         <MotiView
           style={[styles.contentContainer, { backgroundColor: colors.background }]}
@@ -396,11 +543,11 @@ const DiscountDetailsScreen: SharedElementScreenComponent<DiscountDetailsScreenP
               </View>
             </View>
           </View>
-          
+
           <MotiView
             style={[
               styles.expirationCard,
-              { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)' }
+              { backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)' },
             ]}
             from={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -413,25 +560,25 @@ const DiscountDetailsScreen: SharedElementScreenComponent<DiscountDetailsScreenP
               <View style={[
                 styles.expirationBadge,
                 {
-                  backgroundColor: getDaysRemaining(discount.endDate) > 30 
-                    ? `${colors.success}15` 
-                    : getDaysRemaining(discount.endDate) > 7 
-                      ? `${colors.warning}15` 
-                      : `${colors.error}15`
-                }
+                  backgroundColor: getDaysRemaining(discount.endDate) > 30
+                    ? `${colors.success}15`
+                    : getDaysRemaining(discount.endDate) > 7
+                      ? `${colors.warning}15`
+                      : `${colors.error}15`,
+                },
               ]}>
                 <Text variant="labelSmall" color={
-                  getDaysRemaining(discount.endDate) > 30 
-                    ? colors.success 
-                    : getDaysRemaining(discount.endDate) > 7 
-                      ? colors.warning 
+                  getDaysRemaining(discount.endDate) > 30
+                    ? colors.success
+                    : getDaysRemaining(discount.endDate) > 7
+                      ? colors.warning
                       : colors.error
                 }>
                   {getDaysRemaining(discount.endDate)} days
                 </Text>
               </View>
             </View>
-            
+
             <View style={styles.expirationDetails}>
               <CalendarIcon size={16} color={colors.textSecondary} />
               <Text variant="bodySmall" color={colors.textSecondary} style={styles.expirationDate}>
@@ -439,7 +586,7 @@ const DiscountDetailsScreen: SharedElementScreenComponent<DiscountDetailsScreenP
               </Text>
             </View>
           </MotiView>
-          
+
           <MotiView
             style={styles.descriptionSection}
             from={{ opacity: 0, translateY: 20 }}
@@ -453,7 +600,7 @@ const DiscountDetailsScreen: SharedElementScreenComponent<DiscountDetailsScreenP
               {discount.description}
             </Text>
           </MotiView>
-          
+
           <MotiView
             style={styles.redeemSection}
             from={{ opacity: 0, translateY: 20 }}
@@ -529,7 +676,7 @@ const DiscountDetailsScreen: SharedElementScreenComponent<DiscountDetailsScreenP
               )}
             </View>
           </MotiView>
-          
+
           <MotiView
             style={styles.termsSection}
             from={{ opacity: 0, translateY: 20 }}
@@ -550,23 +697,23 @@ const DiscountDetailsScreen: SharedElementScreenComponent<DiscountDetailsScreenP
               ))}
             </View>
           </MotiView>
-          
+
           <View style={{ height: 120 }} />
         </MotiView>
       </Animated.ScrollView>
-      
-      <View 
+
+      <View
         style={[
           styles.ctaContainer,
           {
             backgroundColor: colors.background,
             paddingBottom: Math.max(insets.bottom, SPACING.md),
             borderTopColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-          }
+          },
         ]}
       >
         <Button
-          title={isOnline ? "Redeem Online" : "Redeem In Store"}
+          title={isOnline ? 'Redeem Online' : 'Redeem In Store'}
           onPress={handleRedeemPress}
           loading={redeemLoading}
           fullWidth
@@ -799,6 +946,43 @@ const styles = StyleSheet.create({
   },
   redeemButton: {
     height: moderateScale(54),
+  },
+  // Alert styles
+  alertContainer: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 60 : 40,
+    left: SPACING.md,
+    right: SPACING.md,
+    padding: SPACING.md,
+    borderRadius: SPACING.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+    zIndex: 1001,
+  },
+  alertContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  alertIconContainer: {
+    marginRight: SPACING.sm,
+    paddingTop: 2,
+  },
+  alertTextContainer: {
+    flex: 1,
+  },
+  alertTitle: {
+    marginBottom: 2,
+    fontWeight: '600',
+  },
+  alertCloseButton: {
+    padding: SPACING.xs,
+    marginLeft: SPACING.xs,
   },
 });
 

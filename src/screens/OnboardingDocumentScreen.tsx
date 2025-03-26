@@ -3,7 +3,6 @@ import {
   View,
   StyleSheet,
   TouchableOpacity,
-  Alert,
   Animated,
   Easing,
   Platform,
@@ -20,43 +19,99 @@ import ScreenContainer from '../components/ScreenContainer';
 import Text from '../components/Text';
 import Button from '../components/Button';
 import { SPACING, BORDER_RADIUS } from '../constants/globalStyles';
-import { CameraIcon, IDCardIcon, CheckIcon, ThemeToggleIcon } from '../components/icons';
+import {
+  CameraIcon,
+  IDCardIcon,
+  CheckIcon,
+  ThemeToggleIcon,
+  AlertCircleIcon, // Added for alerts
+  CheckCircleIcon, // Added for alerts
+  InfoIcon, // Added for alerts
+  XIcon, // Added for alert close button
+} from '../components/icons';
 import ApiService from '../services/ApiService';
 import * as ImagePicker from 'expo-image-picker';
-import { 
-  horizontalScale, 
-  verticalScale, 
+import {
+  horizontalScale,
+  verticalScale,
   moderateScale,
   isSmallDevice,
   isTablet,
   useOrientation,
-  OrientationType
+  OrientationType,
 } from '../utils/responsiveUtils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-type OnboardingDocumentScreenNavigationProp = StackNavigationProp<RootStackParamList, 'OnboardingDocument'>;
+type OnboardingDocumentScreenNavigationProp = StackNavigationProp<
+  RootStackParamList,
+  'OnboardingDocument'
+>;
 
 interface OnboardingDocumentScreenProps {
   navigation: OnboardingDocumentScreenNavigationProp;
+}
+
+// Alert types for in-screen alerts
+type AlertType = 'error' | 'success' | 'info' | null;
+
+interface AlertData {
+  type: AlertType;
+  message: string;
+  title?: string;
 }
 
 const OnboardingDocumentScreen: React.FC<OnboardingDocumentScreenProps> = ({ navigation }) => {
   const { colors, styles, theme, toggleTheme } = useTheme();
   const { width, height } = useWindowDimensions();
   const orientation = useOrientation();
-  
+
   // State
   const [image, setImage] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [success, setSuccess] = useState(false);
-  
+
+  // Alert state and animation
+  const [alert, setAlert] = useState<AlertData | null>(null);
+  const alertAnimation = useRef(new Animated.Value(0)).current;
+
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const translateYAnim = useRef(new Animated.Value(30)).current;
   const uploadBoxAnim = useRef(new Animated.Value(1)).current;
   const successAnim = useRef(new Animated.Value(0)).current;
   const checkmarkScale = useRef(new Animated.Value(0)).current;
-  
+
+  // Show in-screen alert
+  const showAlert = (type: AlertType, message: string, title?: string, duration = 5000) => {
+    setAlert({ type, message, title });
+
+    // Animate alert in
+    Animated.spring(alertAnimation, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 80,
+      friction: 8,
+    }).start();
+
+    // Auto-hide after duration
+    if (duration > 0) {
+      setTimeout(() => {
+        hideAlert();
+      }, duration);
+    }
+  };
+
+  // Hide in-screen alert
+  const hideAlert = () => {
+    Animated.timing(alertAnimation, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setAlert(null);
+    });
+  };
+
   // Run entrance animations
   useEffect(() => {
     Animated.parallel([
@@ -73,40 +128,57 @@ const OnboardingDocumentScreen: React.FC<OnboardingDocumentScreenProps> = ({ nav
       }),
     ]).start();
   }, []);
-  
+
   // Request permissions on Android
   useEffect(() => {
     (async () => {
       if (Platform.OS === 'android') {
         try {
-          const granted = await PermissionsAndroid.request(
+          const cameraGranted = await PermissionsAndroid.request(
             PermissionsAndroid.PERMISSIONS.CAMERA,
             {
-              title: "Camera Permission",
-              message: "CampusClub needs access to your camera to take a photo of your student ID.",
-              buttonNeutral: "Ask Me Later",
-              buttonNegative: "Cancel",
-              buttonPositive: "OK"
+              title: 'Camera Permission',
+              message: 'CampusClub needs access to your camera to take a photo of your student ID.',
+              buttonNeutral: 'Ask Me Later',
+              buttonNegative: 'Cancel',
+              buttonPositive: 'OK',
             }
           );
-          
+
           const storageGranted = await PermissionsAndroid.request(
             PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
             {
-              title: "Storage Permission",
-              message: "CampusClub needs access to your storage to select a photo of your student ID.",
-              buttonNeutral: "Ask Me Later",
-              buttonNegative: "Cancel",
-              buttonPositive: "OK"
+              title: 'Storage Permission',
+              message: 'CampusClub needs access to your storage to select a photo of your student ID.',
+              buttonNeutral: 'Ask Me Later',
+              buttonNegative: 'Cancel',
+              buttonPositive: 'OK',
             }
           );
+
+          if (cameraGranted !== PermissionsAndroid.RESULTS.GRANTED) {
+            showAlert(
+              'error',
+              'Camera permission denied. Please enable it in your settings to take a photo.',
+              'Permission Required'
+            );
+          }
+
+          if (storageGranted !== PermissionsAndroid.RESULTS.GRANTED) {
+            showAlert(
+              'error',
+              'Storage permission denied. Please enable it in your settings to select a photo.',
+              'Permission Required'
+            );
+          }
         } catch (err) {
           console.warn(err);
+          showAlert('error', 'Failed to request permissions. Please try again.', 'Error');
         }
       }
     })();
   }, []);
-  
+
   // Animate to success state
   const animateToSuccess = () => {
     Animated.sequence([
@@ -130,7 +202,7 @@ const OnboardingDocumentScreen: React.FC<OnboardingDocumentScreenProps> = ({ nav
       ]),
     ]).start();
   };
-  
+
   // Take a photo using camera
   const takePicture = async () => {
     try {
@@ -139,19 +211,18 @@ const OnboardingDocumentScreen: React.FC<OnboardingDocumentScreenProps> = ({ nav
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
-        // Set a maximum width/height to prevent memory issues with very large images
         exif: false,
       });
-      
+
       if (!result.canceled) {
         setImage(result.assets[0].uri);
       }
     } catch (error) {
       console.error('Error taking picture:', error);
-      Alert.alert('Error', 'Failed to take picture. Please try again.');
+      showAlert('error', 'Failed to take picture. Please try again.', 'Error');
     }
   };
-  
+
   // Pick an image from gallery
   const pickImage = async () => {
     try {
@@ -160,37 +231,36 @@ const OnboardingDocumentScreen: React.FC<OnboardingDocumentScreenProps> = ({ nav
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
-        // Set a maximum width/height to prevent memory issues
         exif: false,
       });
-      
+
       if (!result.canceled) {
         setImage(result.assets[0].uri);
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to pick image. Please try again.');
+      showAlert('error', 'Failed to pick image. Please try again.', 'Error');
     }
   };
-  
+
   // Upload image to server
   const uploadImage = async () => {
     if (!image) {
-      Alert.alert('Error', 'Please select or take a photo of your student ID first.');
+      showAlert('error', 'Please select or take a photo of your student ID first.', 'Error');
       return;
     }
-    
+
     setUploading(true);
-    
+
     try {
       // First get the user's email from storage or API
       const userEmail = await getUserEmail();
-      
+
       // Create form data for upload
       const formData = new FormData();
       const fileExt = image.split('.').pop();
       const fileName = `student_id_${Date.now()}.${fileExt}`;
-      
+
       // Add the file
       // @ts-ignore - TypeScript doesn't like the FormData API with React Native
       formData.append('file', {
@@ -198,21 +268,31 @@ const OnboardingDocumentScreen: React.FC<OnboardingDocumentScreenProps> = ({ nav
         name: fileName,
         type: `image/${fileExt}`,
       });
-      
+
       // Add required fields from backend validation
       formData.append('email', userEmail);
-      
+
       const response = await ApiService.uploadStudentID(formData);
-      
-      if (response.success) {  // Keep using success since ApiService returns this
-        setSuccess(true);
-        animateToSuccess();
+
+      console.log('Upload response:', response);
+
+      if (response.success) {
+        // Show success alert before animating
+        showAlert('success', 'Student ID uploaded successfully!', 'Success', 1500);
+        setTimeout(() => {
+          setSuccess(true);
+          animateToSuccess();
+        }, 1500);
       } else {
-        Alert.alert('Upload Failed', Array.isArray(response.message) ? response.message[0] : response.message);
+        showAlert(
+          'error',
+          Array.isArray(response.message) ? response.message[0] : response.message,
+          'Upload Failed'
+        );
       }
     } catch (error) {
       console.error('Error uploading image:', error);
-      Alert.alert('Upload Failed', 'An unexpected error occurred');
+      showAlert('error', 'An unexpected error occurred', 'Upload Failed');
     } finally {
       setUploading(false);
     }
@@ -228,19 +308,22 @@ const OnboardingDocumentScreen: React.FC<OnboardingDocumentScreenProps> = ({ nav
           return userData.email;
         }
       }
-      
+
       // Second, try to get email from student status (API call)
       const statusResponse = await ApiService.getStudentStatus();
       if (statusResponse.success && statusResponse.data && statusResponse.data.email) {
         return statusResponse.data.email;
       }
-      
+
+      // If no email is found, throw an error
+      throw new Error('User email not found');
     } catch (error) {
       console.error('Error getting user email:', error);
+      showAlert('error', 'Failed to retrieve user email. Please try again.', 'Error');
       throw error;
     }
   };
-  
+
   // Go to login screen
   const goToLogin = () => {
     navigation.reset({
@@ -248,81 +331,178 @@ const OnboardingDocumentScreen: React.FC<OnboardingDocumentScreenProps> = ({ nav
       routes: [{ name: 'Login' }],
     });
   };
-  
+
   // Calculate responsive dimensions
   const getPreviewHeight = () => {
-    // Make preview height responsive to screen size
     if (isTablet) {
       return orientation === 'LANDSCAPE' ? height * 0.4 : height * 0.3;
     }
-    
+
     return orientation === 'LANDSCAPE' ? height * 0.5 : moderateScale(250);
   };
-  
+
   const previewHeight = getPreviewHeight();
-  
+
+  // Render alert icon based on type
+  const renderAlertIcon = () => {
+    if (!alert) return null;
+
+    switch (alert.type) {
+      case 'error':
+        return <AlertCircleIcon size={24} color={colors.error} />;
+      case 'success':
+        return <CheckCircleIcon size={24} color={colors.success} />;
+      case 'info':
+        return <InfoIcon size={24} color={colors.info} />;
+      default:
+        return null;
+    }
+  };
+
+  // Get alert background color based on type
+  const getAlertBackgroundColor = () => {
+    if (!alert) return colors.card;
+
+    switch (alert.type) {
+      case 'error':
+        return theme === 'dark' ? '#3D1515' : '#FEE7E7';
+      case 'success':
+        return theme === 'dark' ? '#153D1A' : '#E7FEEA';
+      case 'info':
+        return theme === 'dark' ? '#15293D' : '#E7F2FE';
+      default:
+        return colors.card;
+    }
+  };
+
+  // Get alert text color based on type
+  const getAlertTextColor = () => {
+    if (!alert) return colors.text;
+
+    switch (alert.type) {
+      case 'error':
+        return theme === 'dark' ? '#FF9A9A' : '#D32F2F';
+      case 'success':
+        return theme === 'dark' ? '#9AFFAE' : '#2E7D32';
+      case 'info':
+        return theme === 'dark' ? '#9AC8FF' : '#1976D2';
+      default:
+        return colors.text;
+    }
+  };
+
   return (
-    <ScreenContainer 
-      scrollable={true} // Changed to true to make content scrollable
+    <ScreenContainer
+      scrollable={true}
       statusBarStyle={theme === 'dark' ? 'light-content' : 'dark-content'}
     >
-      <Animated.View 
+      {/* In-screen alert */}
+      {alert && (
+        <Animated.View
+          style={[
+            localStyles.alertContainer,
+            {
+              backgroundColor: getAlertBackgroundColor(),
+              transform: [
+                {
+                  translateY: alertAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [-100, 0],
+                  }),
+                },
+                {
+                  scale: alertAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.9, 1],
+                  }),
+                },
+              ],
+              opacity: alertAnimation,
+              borderLeftWidth: 4,
+              borderLeftColor: getAlertTextColor(),
+            },
+          ]}
+        >
+          <View style={localStyles.alertContent}>
+            <View style={localStyles.alertIconContainer}>{renderAlertIcon()}</View>
+            <View style={localStyles.alertTextContainer}>
+              {alert.title && (
+                <Text
+                  variant="labelLarge"
+                  style={[localStyles.alertTitle, { color: getAlertTextColor() }]}
+                >
+                  {alert.title}
+                </Text>
+              )}
+              <Text variant="bodyMedium" style={{ color: colors.text }}>
+                {alert.message}
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={localStyles.alertCloseButton}
+            onPress={hideAlert}
+            hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+          >
+            <XIcon size={16} color={colors.textSecondary} />
+          </TouchableOpacity>
+        </Animated.View>
+      )}
+
+      <Animated.View
         style={[
           styles.layout.paddedContainer,
           {
             opacity: fadeAnim,
             transform: [{ translateY: translateYAnim }],
-            paddingBottom: verticalScale(30), // Add padding to bottom for scrolling
+            paddingBottom: verticalScale(30),
           },
         ]}
       >
         {/* Header with theme toggle */}
         <View style={localStyles.header}>
-          <Text variant={isTablet ? "displaySmall" : "headingLarge"}>CampusClub</Text>
-          <TouchableOpacity 
-            style={localStyles.themeToggle} 
-            onPress={toggleTheme}
-          >
+          <Text variant={isTablet ? 'displaySmall' : 'headingLarge'}>CampusClub</Text>
+          <TouchableOpacity style={localStyles.themeToggle} onPress={toggleTheme}>
             <ThemeToggleIcon size={moderateScale(24)} color={colors.text} />
           </TouchableOpacity>
         </View>
-        
+
         {/* Progress indicator */}
         <View style={localStyles.progressContainer}>
           <View style={localStyles.progressBar}>
-            <View 
+            <View
               style={[
-                localStyles.progressFill, 
-                { 
+                localStyles.progressFill,
+                {
                   backgroundColor: colors.primary,
-                  width: '100%', 
+                  width: '100%',
                 },
-              ]} 
+              ]}
             />
           </View>
           <Text variant="labelSmall" color={colors.textSecondary}>
             Step 2 of 2
           </Text>
         </View>
-        
+
         {/* Upload Content */}
         <View style={localStyles.contentContainer}>
-          <Text variant={isTablet ? "headingLarge" : "headingMedium"} style={localStyles.title}>
+          <Text variant={isTablet ? 'headingLarge' : 'headingMedium'} style={localStyles.title}>
             Upload Student ID
           </Text>
-          <Text 
-            variant={isTablet ? "bodyLarge" : "bodyMedium"} 
-            color={colors.textSecondary} 
+          <Text
+            variant={isTablet ? 'bodyLarge' : 'bodyMedium'}
+            color={colors.textSecondary}
             style={localStyles.subtitle}
           >
             Please upload a clear photo of your student ID to verify your student status.
           </Text>
-          
+
           {/* Upload Box */}
-          <Animated.View 
+          <Animated.View
             style={[
               localStyles.uploadContainer,
-              { 
+              {
                 opacity: uploadBoxAnim,
                 display: success ? 'none' : 'flex',
               },
@@ -330,27 +510,25 @@ const OnboardingDocumentScreen: React.FC<OnboardingDocumentScreenProps> = ({ nav
           >
             {image ? (
               <View style={localStyles.previewContainer}>
-                <Image 
-                  source={{ uri: image }} 
-                  style={[
-                    localStyles.preview,
-                    { height: previewHeight }
-                  ]} 
+                <Image
+                  source={{ uri: image }}
+                  style={[localStyles.preview, { height: previewHeight }]}
                   resizeMode="cover"
                 />
-                <View style={[
-                  localStyles.imageActions,
-                  { 
-                    backgroundColor: theme === 'dark' 
-                      ? colors.backgroundSecondary 
-                      : '#F8FAFC',
-                    flexDirection: orientation === 'PORTRAIT' || isTablet 
-                      ? 'row' 
-                      : isSmallDevice 
-                        ? 'column' 
-                        : 'row'
-                  }
-                ]}>
+                <View
+                  style={[
+                    localStyles.imageActions,
+                    {
+                      backgroundColor: theme === 'dark' ? colors.backgroundSecondary : '#F8FAFC',
+                      flexDirection:
+                        orientation === 'PORTRAIT' || isTablet
+                          ? 'row'
+                          : isSmallDevice
+                          ? 'column'
+                          : 'row',
+                    },
+                  ]}
+                >
                   <Button
                     title="Change Photo"
                     onPress={pickImage}
@@ -359,9 +537,9 @@ const OnboardingDocumentScreen: React.FC<OnboardingDocumentScreenProps> = ({ nav
                     disabled={uploading}
                     style={[
                       localStyles.imageActionButton,
-                      orientation === 'LANDSCAPE' && !isTablet && isSmallDevice 
-                        ? { marginBottom: verticalScale(8) } 
-                        : {}
+                      orientation === 'LANDSCAPE' && !isTablet && isSmallDevice
+                        ? { marginBottom: verticalScale(8) }
+                        : {},
                     ]}
                   />
                   <Button
@@ -376,29 +554,28 @@ const OnboardingDocumentScreen: React.FC<OnboardingDocumentScreenProps> = ({ nav
               </View>
             ) : (
               <View style={localStyles.uploadBox}>
-                <IDCardIcon 
-                  size={moderateScale(isTablet ? 80 : 60)} 
-                  color={colors.textSecondary} 
-                />
-                <Text 
-                  variant={isTablet ? "headingMedium" : "headingSmall"} 
+                <IDCardIcon size={moderateScale(isTablet ? 80 : 60)} color={colors.textSecondary} />
+                <Text
+                  variant={isTablet ? 'headingMedium' : 'headingSmall'}
                   style={localStyles.uploadText}
                 >
                   Upload Student ID
                 </Text>
-                <Text 
-                  variant={isTablet ? "bodyLarge" : "bodyMedium"} 
-                  color={colors.textSecondary} 
+                <Text
+                  variant={isTablet ? 'bodyLarge' : 'bodyMedium'}
+                  color={colors.textSecondary}
                   style={localStyles.uploadSubtext}
                 >
                   Take a clear photo of your student ID card
                 </Text>
-                <View style={[
-                  localStyles.uploadActions,
-                  orientation === 'LANDSCAPE' && !isTablet && isSmallDevice 
-                    ? { flexDirection: 'column' } 
-                    : {}
-                ]}>
+                <View
+                  style={[
+                    localStyles.uploadActions,
+                    orientation === 'LANDSCAPE' && !isTablet && isSmallDevice
+                      ? { flexDirection: 'column' }
+                      : {},
+                  ]}
+                >
                   <Button
                     title="Take Photo"
                     onPress={takePicture}
@@ -406,9 +583,9 @@ const OnboardingDocumentScreen: React.FC<OnboardingDocumentScreenProps> = ({ nav
                     iconPosition="left"
                     style={[
                       localStyles.uploadButton,
-                      orientation === 'LANDSCAPE' && !isTablet && isSmallDevice 
-                        ? { marginBottom: verticalScale(8), marginHorizontal: 0 } 
-                        : {}
+                      orientation === 'LANDSCAPE' && !isTablet && isSmallDevice
+                        ? { marginBottom: verticalScale(8), marginHorizontal: 0 }
+                        : {},
                     ]}
                   />
                   <Button
@@ -417,31 +594,31 @@ const OnboardingDocumentScreen: React.FC<OnboardingDocumentScreenProps> = ({ nav
                     variant="outlined"
                     style={[
                       localStyles.uploadButton,
-                      orientation === 'LANDSCAPE' && !isTablet && isSmallDevice 
-                        ? { marginHorizontal: 0 } 
-                        : {}
+                      orientation === 'LANDSCAPE' && !isTablet && isSmallDevice
+                        ? { marginHorizontal: 0 }
+                        : {},
                     ]}
                   />
                 </View>
               </View>
             )}
           </Animated.View>
-          
+
           {/* Success State */}
-          <Animated.View 
+          <Animated.View
             style={[
               localStyles.successContainer,
-              { 
+              {
                 opacity: successAnim,
                 display: success ? 'flex' : 'none',
               },
             ]}
           >
             <View style={localStyles.successContent}>
-              <Animated.View 
+              <Animated.View
                 style={[
                   localStyles.checkmarkCircle,
-                  { 
+                  {
                     backgroundColor: colors.success,
                     transform: [{ scale: checkmarkScale }],
                     width: moderateScale(80),
@@ -452,18 +629,19 @@ const OnboardingDocumentScreen: React.FC<OnboardingDocumentScreenProps> = ({ nav
               >
                 <CheckIcon size={moderateScale(40)} color="white" />
               </Animated.View>
-              <Text 
-                variant={isTablet ? "headingLarge" : "headingMedium"} 
+              <Text
+                variant={isTablet ? 'headingLarge' : 'headingMedium'}
                 style={localStyles.successTitle}
               >
                 Upload Successful!
               </Text>
-              <Text 
-                variant={isTablet ? "bodyLarge" : "bodyMedium"} 
-                color={colors.textSecondary} 
+              <Text
+                variant={isTablet ? 'bodyLarge' : 'bodyMedium'}
+                color={colors.textSecondary}
                 style={localStyles.successText}
               >
-                Your student ID has been submitted for verification. We'll review it shortly. You'll be notified when your account is approved.
+                Your student ID has been submitted for verification. We'll review it shortly. You'll
+                be notified when your account is approved.
               </Text>
               <Button
                 title="Back to Login"
@@ -473,51 +651,36 @@ const OnboardingDocumentScreen: React.FC<OnboardingDocumentScreenProps> = ({ nav
               />
             </View>
           </Animated.View>
-          
+
           {/* Guidelines and Tips */}
-          <View style={[
-            localStyles.guidelinesContainer, 
-            { display: success ? 'none' : 'flex' }
-          ]}>
-            <Text 
-              variant={isTablet ? "titleMedium" : "labelLarge"} 
+          <View style={[{ display: success ? 'none' : 'flex' }, localStyles.guidelinesContainer]}>
+            <Text
+              variant={isTablet ? 'titleMedium' : 'labelLarge'}
               style={localStyles.guidelinesTitle}
             >
               Tips for a successful verification:
             </Text>
             <View style={localStyles.guideline}>
               <View style={[localStyles.guidelineDot, { backgroundColor: colors.primary }]} />
-              <Text 
-                variant={isTablet ? "bodyLarge" : "bodyMedium"} 
-                color={colors.textSecondary}
-              >
+              <Text variant={isTablet ? 'bodyLarge' : 'bodyMedium'} color={colors.textSecondary}>
                 Ensure all text is clearly visible
               </Text>
             </View>
             <View style={localStyles.guideline}>
               <View style={[localStyles.guidelineDot, { backgroundColor: colors.primary }]} />
-              <Text 
-                variant={isTablet ? "bodyLarge" : "bodyMedium"} 
-                color={colors.textSecondary}
-              >
+              <Text variant={isTablet ? 'bodyLarge' : 'bodyMedium'} color={colors.textSecondary}>
                 Make sure your name and student ID are readable
               </Text>
             </View>
             <View style={localStyles.guideline}>
               <View style={[localStyles.guidelineDot, { backgroundColor: colors.primary }]} />
-              <Text 
-                variant={isTablet ? "bodyLarge" : "bodyMedium"} 
-                color={colors.textSecondary}
-              >
+              <Text variant={isTablet ? 'bodyLarge' : 'bodyMedium'} color={colors.textSecondary}>
                 Include the university logo or name if possible
               </Text>
             </View>
             <View style={localStyles.guideline}>
               <View style={[localStyles.guidelineDot, { backgroundColor: colors.primary }]} />
-              <Text 
-                variant={isTablet ? "bodyLarge" : "bodyMedium"} 
-                color={colors.textSecondary}
-              >
+              <Text variant={isTablet ? 'bodyLarge' : 'bodyMedium'} color={colors.textSecondary}>
                 Avoid glare or shadows on the ID card
               </Text>
             </View>
@@ -661,6 +824,43 @@ const localStyles = StyleSheet.create({
   successButton: {
     marginTop: verticalScale(24),
     minWidth: horizontalScale(200),
+  },
+  // Alert styles (copied from previous screens)
+  alertContainer: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 60 : 40,
+    left: SPACING.md,
+    right: SPACING.md,
+    padding: SPACING.md,
+    borderRadius: SPACING.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+    zIndex: 1001,
+  },
+  alertContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  alertIconContainer: {
+    marginRight: SPACING.sm,
+    paddingTop: 2,
+  },
+  alertTextContainer: {
+    flex: 1,
+  },
+  alertTitle: {
+    marginBottom: 2,
+    fontWeight: '600',
+  },
+  alertCloseButton: {
+    padding: SPACING.xs,
+    marginLeft: SPACING.xs,
   },
 });
 
