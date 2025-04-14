@@ -1,4 +1,3 @@
-// src/screens/EventAttendeesScreen.tsx
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -68,33 +67,15 @@ const EventAttendeesScreen: React.FC<EventAttendeesScreenProps> = ({ navigation,
   // Fetch event details to get the title
   const fetchEventDetails = async () => {
     try {
-      // Fetch events from all statuses to find the specific event
-      const upcomingResponse = await ApiService.getEvents({
-        status: 'UPCOMING',
-        eventScope: 'UNIVERSITY'
-      });
+      const response = await ApiService.getEvents('UNIVERSITY');
       
-      const liveResponse = await ApiService.getEvents({
-        status: 'LIVE',
-        eventScope: 'UNIVERSITY'
-      });
-      
-      const completedResponse = await ApiService.getEvents({
-        status: 'COMPLETED',
-        eventScope: 'UNIVERSITY'
-      });
-      
-      // Combine all events and find the one with matching ID
-      const allEvents = [
-        ...(upcomingResponse.success && upcomingResponse.data ? upcomingResponse.data : []),
-        ...(liveResponse.success && liveResponse.data ? liveResponse.data : []),
-        ...(completedResponse.success && completedResponse.data ? completedResponse.data : [])
-      ];
-      
-      const event = allEvents.find(e => e._id === eventId);
-      
-      if (event) {
-        setEventTitle(event.title);
+      if (response.success && response.data) {
+        const allEvents = response.data;
+        const event = allEvents.find(e => e._id === eventId);
+        
+        if (event) {
+          setEventTitle(event.title);
+        }
       }
     } catch (error) {
       console.error('Error fetching event details:', error);

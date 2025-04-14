@@ -1,11 +1,9 @@
-// src/screens/EventsListScreen.tsx
 import React, { useState, useEffect } from 'react';
 import {
   View,
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Image,
   ActivityIndicator,
   RefreshControl,
   Platform
@@ -67,18 +65,28 @@ const EventsListScreen: React.FC<EventsListScreenProps> = ({ navigation, route }
     setLoading(true);
     
     try {
-      const response = await ApiService.getEvents({
-        status: status,
-        eventScope: 'UNIVERSITY'
-      });
+      const response = await ApiService.getEvents('PUBLIC');
       
       if (response.success && response.data) {
-        setEvents(response.data);
+        // Filter events based on status
+        const now = Date.now() / 1000;
+        const filteredEvents = response.data.filter((event) => {
+          if (status === 'UPCOMING') {
+            return event.startTime > now && event.status === 'UPCOMING';
+          } else if (status === 'LIVE') {
+            return event.startTime <= now && event.endTime >= now && event.status === 'LIVE';
+          } else if (status === 'COMPLETED') {
+            return event.endTime < now && event.status === 'COMPLETED';
+          }
+          return false;
+        });
+        
+        setEvents(filteredEvents);
         
         // Fetch registration counts for each event
         const counts: Record<string, number> = {};
         
-        await Promise.all(response.data.map(async (event) => {
+        await Promise.all(filteredEvents.map(async (event) => {
           try {
             const regResponse = await ApiService.getRegisteredStudents(event._id);
             if (regResponse.success && regResponse.data) {
@@ -116,10 +124,10 @@ const EventsListScreen: React.FC<EventsListScreenProps> = ({ navigation, route }
   };
   
   // Format date for display
-  const formatEventDate = (startTime: string, endTime: string) => {
+  const formatEventDate = (startTime: number, endTime: number) => {
     try {
-      const start = new Date(startTime);
-      const end = new Date(endTime);
+      const start = new Date(startTime * 1000);
+      const end = new Date(endTime * 1000);
       
       const dateStr = format(start, 'EEE, MMM d');
       const startTimeStr = format(start, 'h:mm a');
@@ -128,7 +136,7 @@ const EventsListScreen: React.FC<EventsListScreenProps> = ({ navigation, route }
       return `${dateStr} • ${startTimeStr} - ${endTimeStr}`;
     } catch (error) {
       console.error('Error formatting date:', error);
-      return startTime;
+      return 'Invalid Date';
     }
   };
   
@@ -139,12 +147,6 @@ const EventsListScreen: React.FC<EventsListScreenProps> = ({ navigation, route }
       onPress={() => handleEventPress(item)}
       activeOpacity={0.9}
     >
-      <Image 
-        source={{ uri: item.backgroundImage }}
-        style={styles.eventImage}
-        resizeMode="cover"
-      />
-      
       <View style={styles.eventContent}>
         <View style={styles.eventHeader}>
           <Text variant="titleSmall" color={colors.text} numberOfLines={1} style={styles.eventTitle}>
@@ -196,7 +198,6 @@ const EventsListScreen: React.FC<EventsListScreenProps> = ({ navigation, route }
   // Render loading skeleton
   const renderSkeletonItem = () => (
     <View style={[styles.eventCard, { backgroundColor: colors.card }]}>
-      <Skeleton style={styles.eventImage} />
       <View style={styles.eventContent}>
         <Skeleton style={{ height: 20, width: '80%', marginBottom: SPACING.xs }} />
         <Skeleton style={{ height: 16, width: '70%', marginBottom: SPACING.xs }} />
@@ -209,11 +210,6 @@ const EventsListScreen: React.FC<EventsListScreenProps> = ({ navigation, route }
   // Render empty state
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
-      <Image 
-        source={require('../assets/images/empty-events.png')} 
-        style={styles.emptyImage} 
-        resizeMode="contain"
-      />
       <Text variant="titleMedium" color={colors.text} style={styles.emptyTitle}>
         No {status} events
       </Text>
@@ -296,7 +292,6 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   eventCard: {
-    flexDirection: 'row',
     borderRadius: BORDER_RADIUS.lg,
     overflow: 'hidden',
     marginBottom: SPACING.md,
@@ -306,12 +301,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  eventImage: {
-    width: moderateScale(120),
-    height: '100%',
-  },
   eventContent: {
-    flex: 1,
     padding: SPACING.md,
   },
   eventHeader: {
@@ -351,12 +341,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: SPACING.xl,
     marginTop: SPACING.xxl,
-  },
-  emptyImage: {
-    width: moderateScale(150),
-    height: moderateScale(150),
-    marginBottom: SPACING.lg,
-    opacity: 0.8,
   },
   emptyTitle: {
     marginBottom: SPACING.sm,

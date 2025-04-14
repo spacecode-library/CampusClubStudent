@@ -31,7 +31,7 @@ import {
   CheckIcon,
 } from '../components/NavigationIcons';
 
-import {  AlertCircleIcon, XIcon, CheckCircleIcon,} from '../components/icons/index';
+import { AlertCircleIcon, XIcon, CheckCircleIcon } from '../components/icons/index';
 import * as Haptics from 'expo-haptics';
 import ApiService, { Event } from '../services/ApiService';
 import { StatusBar } from 'expo-status-bar';
@@ -127,40 +127,29 @@ const EditEventScreen: React.FC<EditEventScreenProps> = ({ navigation, route }) 
       setIsLoading(true);
 
       try {
-        const upcomingResponse = await ApiService.getEvents({
-          status: 'UPCOMING',
-          eventScope: 'UNIVERSITY',
-        });
+        const response = await ApiService.getEvents('UNIVERSITY');
 
-        const liveResponse = await ApiService.getEvents({
-          status: 'LIVE',
-          eventScope: 'UNIVERSITY',
-        });
+        if (response.success && response.data) {
+          const allEvents = response.data;
+          const event = allEvents.find((e) => e._id === eventId);
 
-        const completedResponse = await ApiService.getEvents({
-          status: 'COMPLETED',
-          eventScope: 'UNIVERSITY',
-        });
-
-        const allEvents = [
-          ...(upcomingResponse.success && upcomingResponse.data ? upcomingResponse.data : []),
-          ...(liveResponse.success && liveResponse.data ? liveResponse.data : []),
-          ...(completedResponse.success && completedResponse.data ? completedResponse.data : []),
-        ];
-
-        const event = allEvents.find((e) => e._id === eventId);
-
-        if (event) {
-          setTitle(event.title);
-          setDescription(event.description);
-          setVenue(event.venue);
-          setTerms(event.termsCondition);
-          setStartDate(new Date(event.startTime));
-          setEndDate(new Date(event.endTime));
-          setBackgroundImage(event.backgroundImage);
-          setEventScope(event.eventScope);
+          if (event) {
+            setTitle(event.title);
+            setDescription(event.description);
+            setVenue(event.venue);
+            setTerms(event.termsCondition);
+            setStartDate(new Date(event.startTime * 1000));
+            setEndDate(new Date(event.endTime * 1000));
+            setBackgroundImage(event.backgroundImage);
+            setEventScope(event.eventScope);
+          } else {
+            showAlert('error', 'Event not found', 'Error');
+            setTimeout(() => {
+              navigation.goBack();
+            }, 1500);
+          }
         } else {
-          showAlert('error', 'Event not found', 'Error');
+          showAlert('error', 'Failed to load event details', 'Error');
           setTimeout(() => {
             navigation.goBack();
           }, 1500);
@@ -235,8 +224,8 @@ const EditEventScreen: React.FC<EditEventScreenProps> = ({ navigation, route }) 
       const response = await ApiService.editEvent(eventId, {
         title,
         description,
-        startTime: startDate!.toISOString(),
-        endTime: endDate!.toISOString(),
+        startTime: Math.floor(startDate!.getTime() / 1000).toString(),
+        endTime: Math.floor(endDate!.getTime() / 1000).toString(),
         venue,
         termsCondition: terms,
         backgroundImage,
