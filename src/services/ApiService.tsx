@@ -112,8 +112,8 @@ export interface Event {
   userId: string;
   title: string;
   description: string;
-  startTime: string;
-  endTime: string;
+  startTime: number;
+  endTime: number;
   backgroundImage: string;
   termsCondition: string;
   venue: string;
@@ -122,6 +122,9 @@ export interface Event {
   isDeleted: boolean;
   createdAt: string;
   updatedAt: string;
+  timeZone?: string;
+  eventType?: 'IN_PERSON' | 'ONLINE' | 'HYBRID';
+  onlineLink?: string;
 }
 
 export interface RegisteredEvent {
@@ -145,9 +148,7 @@ export interface RedeemDiscountResponse {
 }
 
 class ApiService {
-
   static mapApiRedemptionToViewRedemption(apiRedemption: any): Redemption {
-    // The API response contains redemption populated with discountId object
     return {
       _id: apiRedemption._id,
       studentId: apiRedemption.studentId,
@@ -170,105 +171,96 @@ class ApiService {
     };
   }
 
-
-  
-
-// Get redemption history for a student
-static async getRedemptionHistory(studentId: string): Promise<ApiResponse<Redemption[]>> {
-  try {
-    const response = await this.fetchData<ApiRedemption[]>(
-      `/student/redemptions/${studentId}`,
-      'GET',
-      undefined,
-      true
-    );
-    
-    if (response.success && response.data) {
-      // Map each API redemption to the view format
-      const mappedRedemptions = response.data.map(item => 
-        this.mapApiRedemptionToViewRedemption(item)
+  // Get redemption history for a student
+  static async getRedemptionHistory(studentId: string): Promise<ApiResponse<Redemption[]>> {
+    try {
+      const response = await this.fetchData<ApiRedemption[]>(
+        `/student/redemptions/${studentId}`,
+        'GET',
+        undefined,
+        true
       );
       
-      return {
-        success: response.success,
-        message: response.message,
-        data: mappedRedemptions
-      };
-    }
-    
-    return {
-      success: response.success,
-      message: response.message
-    };
-  } catch (error: any) {
-    console.error('Error fetching redemption history:', error);
-    return {
-      success: false,
-      message: error.message || 'An unexpected error occurred'
-    };
-  }
-}
-
-// Get specific redemption by ID
-static async getRedemptionById(redemptionId: string): Promise<ApiResponse<Redemption>> {
-  try {
-    const response = await this.fetchData<ApiRedemption>(
-      `/student/redemptions/details/${redemptionId}`,
-      'GET',
-      undefined,
-      true
-    );
-    
-    if (response.success && response.data) {
-      // Transform the API redemption to match the component Redemption interface
-      const mappedRedemption = this.mapApiRedemptionToViewRedemption(response.data);
+      if (response.success && response.data) {
+        const mappedRedemptions = response.data.map(item => 
+          this.mapApiRedemptionToViewRedemption(item)
+        );
+        
+        return {
+          success: response.success,
+          message: response.message,
+          data: mappedRedemptions
+        };
+      }
       
-      // Create a new response object with the correct type
       return {
         success: response.success,
-        message: response.message,
-        data: mappedRedemption
+        message: response.message
+      };
+    } catch (error: any) {
+      console.error('Error fetching redemption history:', error);
+      return {
+        success: false,
+        message: error.message || 'An unexpected error occurred'
       };
     }
-    
-    // Create a new response object without data
-    return {
-      success: response.success,
-      message: response.message
-    };
-  } catch (error: any) {
-    console.error('Error fetching redemption details:', error);
-    return {
-      success: false,
-      message: error.message || 'An unexpected error occurred'
-    };
   }
-}
 
-// Inside ApiService class in ApiService.tsx
-static async getStudentId(): Promise<string> {
-  try {
-    // First, get student data from the API
-    const studentStatus = await this.getStudentStatus();
-    
-    if (studentStatus.success && studentStatus.data) {
-      // Try to get any ID from the response
-      const userJson = await AsyncStorage.getItem(USER_KEY);
-      if (userJson) {
-        const userData = JSON.parse(userJson);
-        if (userData.id) {
-          return userData.id;
+  // Get specific redemption by ID
+  static async getRedemptionById(redemptionId: string): Promise<ApiResponse<Redemption>> {
+    try {
+      const response = await this.fetchData<ApiRedemption>(
+        `/student/redemptions/details/${redemptionId}`,
+        'GET',
+        undefined,
+        true
+      );
+      
+      if (response.success && response.data) {
+        const mappedRedemption = this.mapApiRedemptionToViewRedemption(response.data);
+        
+        return {
+          success: response.success,
+          message: response.message,
+          data: mappedRedemption
+        };
+      }
+      
+      return {
+        success: response.success,
+        message: response.message
+      };
+    } catch (error: any) {
+      console.error('Error fetching redemption details:', error);
+      return {
+        success: false,
+        message: error.message || 'An unexpected error occurred'
+      };
+    }
+  }
+
+  // Get student ID from storage or API
+  static async getStudentId(): Promise<string> {
+    try {
+      const studentStatus = await this.getStudentStatus();
+      
+      if (studentStatus.success && studentStatus.data) {
+        const userJson = await AsyncStorage.getItem(USER_KEY);
+        if (userJson) {
+          const userData = JSON.parse(userJson);
+          if (userData.id) {
+            return userData.id;
+          }
         }
       }
+      
+      return 'default-student-id';
+    } catch (error) {
+      console.error('Error getting student ID:', error);
+      return 'default-student-id';
     }
-    
-    // Fallback to a generic ID for testing purposes
-    return 'default-student-id';
-  } catch (error) {
-    console.error('Error getting student ID:', error);
-    return 'default-student-id';
   }
-}
+
   // Helper to get auth header
   private static async getAuthHeader(): Promise<HeadersInit> {
     const token = await AsyncStorage.getItem(TOKEN_KEY);
@@ -284,85 +276,78 @@ static async getStudentId(): Promise<string> {
     body?: any,
     requiresAuth = true
   ): Promise<ApiResponse<T>> {
+    console.log('Starting fetchData:', { endpoint, method, body, requiresAuth });
+  
     try {
       const headers = requiresAuth 
         ? await this.getAuthHeader() 
         : { 'Content-Type': 'application/json' };
       
+      console.log('Headers:', headers);
+  
       const response = await fetch(`${API_URL}${endpoint}`, {
         method,
         headers,
         body: body ? JSON.stringify(body) : undefined,
       });
-      
-      // Handle redirects (e.g., 301 for subscription redirect)
+  
+      console.log('Fetch Response Status:', response.status);
+      console.log('Fetch Response Headers:', Object.fromEntries(response.headers.entries()));
+  
       if (response.status === 301) {
         const redirectUrl = response.headers.get('location');
+        console.log('Redirect URL:', redirectUrl);
         if (redirectUrl?.includes('/subscription')) {
           return {
             success: false,
             message: 'Premium subscription required to redeem this discount',
-            data: { redirectTo: 'subscription' } as any, // Add a custom field to handle navigation
+            data: { redirectTo: 'subscription' } as any,
           };
         }
       }
-      
+  
       const data = await response.json();
-      
+      console.log('Fetch Response Data:', data);
+  
       if (!response.ok) {
-        // Handle token refresh if 401
+        console.log('Fetch Failed with Status:', response.status);
         if (response.status === 401 && requiresAuth) {
+          console.log('Attempting token refresh due to 401');
           const refreshed = await this.refreshToken();
           if (refreshed) {
-            // Retry the request
+            console.log('Token refreshed successfully, retrying request');
             return this.fetchData(endpoint, method, body, requiresAuth);
+          } else {
+            console.log('Token refresh failed');
           }
         }
-        
+  
         return {
           success: false,
           message: Array.isArray(data.message) ? data.message[0] : data.message || 'An error occurred',
         };
       }
-      
+  
       return data as ApiResponse<T>;
     } catch (error: any) {
-      console.error('API Error:', error);
+      console.error('API Error in fetchData:', error);
       return {
         success: false,
         message: error.message || 'An unexpected error occurred',
       };
     }
   }
-  
+
   // Auth Methods
-  
+
   // Check if user is logged in
   static async isLoggedIn(): Promise<boolean> {
     try {
       const token = await AsyncStorage.getItem(TOKEN_KEY);
       if (!token) return false;
       
-      // Optionally validate the token (lightweight check)
       const userJson = await AsyncStorage.getItem(USER_KEY);
       if (!userJson) return false;
-      
-      // If you want to verify with the server (optional)
-      // Uncomment this to check token validity with server
-      /*
-      try {
-        const response = await this.fetchData<{valid: boolean}>(
-          '/user/validate-token',
-          'GET',
-          undefined,
-          true
-        );
-        return response.success && response.data?.valid === true;
-      } catch (err) {
-        console.error('Token validation error:', err);
-        return false;
-      }
-      */
       
       return true;
     } catch (error) {
@@ -370,8 +355,7 @@ static async getStudentId(): Promise<string> {
       return false;
     }
   }
-  
-  // Rest of the methods remain unchanged...
+
   // Register a new user
   static async register(name: string, email: string, password: string): Promise<ApiResponse<{id: string}>> {
     return this.fetchData<{id: string}>(
@@ -381,12 +365,9 @@ static async getStudentId(): Promise<string> {
       false
     );
   }
-  
+
   // Verify OTP for registration
   static async verifyRegistrationOtp(requestId: string, otp: string): Promise<ApiResponse<AuthResponse>> {
-   
-    console.log('requestId', requestId);
-
     const response = await this.fetchData<AuthResponse>(
       '/user/verify-otp',
       'POST',
@@ -394,23 +375,19 @@ static async getStudentId(): Promise<string> {
       false
     );
 
-    if ( response.data) {
-      // Store tokens
+    if (response.data) {
       await AsyncStorage.setItem(TOKEN_KEY, response.data.token);
       await AsyncStorage.setItem(REFRESH_TOKEN_KEY, response.data.refreshToken);
       
-      // Try to get email from local storage
       try {
         const cachedEmail = await AsyncStorage.getItem('@temp_registration_email');
         
-        // Store basic user info
         const userInfo = {
           id: response.data.identityId,
-          email: cachedEmail // Add email if available
+          email: cachedEmail
         };
         await AsyncStorage.setItem(USER_KEY, JSON.stringify(userInfo));
         
-        // Clean up temporary storage
         await AsyncStorage.removeItem('@temp_registration_email');
       } catch (error) {
         console.warn('Could not store email during registration', error);
@@ -419,7 +396,7 @@ static async getStudentId(): Promise<string> {
     
     return response;
   }
-  
+
   // Resend OTP for registration
   static async resendRegistrationOtp(requestId: string): Promise<ApiResponse<{requestId: string}>> {
     return this.fetchData<{requestId: string}>(
@@ -429,7 +406,7 @@ static async getStudentId(): Promise<string> {
       false
     );
   }
-  
+
   // Login
   static async login(email: string, password: string): Promise<ApiResponse<AuthResponse>> {
     const response = await this.fetchData<AuthResponse>(
@@ -440,11 +417,9 @@ static async getStudentId(): Promise<string> {
     );
     
     if (response.success && response.data) {
-      // Store tokens
       await AsyncStorage.setItem(TOKEN_KEY, response.data.token);
       await AsyncStorage.setItem(REFRESH_TOKEN_KEY, response.data.refreshToken);
       
-      // Store basic user info
       const userInfo = {
         id: response.data.identityId,
         email
@@ -454,14 +429,13 @@ static async getStudentId(): Promise<string> {
     
     return response;
   }
-  
+
   // Refresh token
   static async refreshToken(): Promise<boolean> {
     try {
       const refreshToken = await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
       
       if (!refreshToken) {
-        // No refresh token available
         await this.logout();
         return false;
       }
@@ -472,28 +446,19 @@ static async getStudentId(): Promise<string> {
         body: JSON.stringify({ refreshToken }),
       });
       
-      // Handle non-JSON responses
       if (!response.ok) {
         console.error('Token refresh failed with status:', response.status);
         await this.logout();
         return false;
       }
       
-      try {
-        const data = await response.json() as ApiResponse<AuthResponse>;
-        
-        if (data.success && data.data) {
-          // Update stored tokens
-          await AsyncStorage.setItem(TOKEN_KEY, data.data.token);
-          await AsyncStorage.setItem(REFRESH_TOKEN_KEY, data.data.refreshToken);
-          return true;
-        } else {
-          // Refresh failed
-          await this.logout();
-          return false;
-        }
-      } catch (jsonError) {
-        console.error('Error parsing refresh token response:', jsonError);
+      const data = await response.json() as ApiResponse<AuthResponse>;
+      
+      if (data.success && data.data) {
+        await AsyncStorage.setItem(TOKEN_KEY, data.data.token);
+        await AsyncStorage.setItem(REFRESH_TOKEN_KEY, data.data.refreshToken);
+        return true;
+      } else {
         await this.logout();
         return false;
       }
@@ -503,19 +468,16 @@ static async getStudentId(): Promise<string> {
       return false;
     }
   }
-  
+
   // Logout
   static async logout(): Promise<ApiResponse<null>> {
     try {
-      // Get refresh token for logout API
       const refreshToken = await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
       
-      // Clear local storage
       await AsyncStorage.removeItem(TOKEN_KEY);
       await AsyncStorage.removeItem(REFRESH_TOKEN_KEY);
       await AsyncStorage.removeItem(USER_KEY);
       
-      // Call logout API if we have a token
       if (refreshToken) {
         return this.fetchData<null>(
           '/user/logout',
@@ -531,9 +493,9 @@ static async getStudentId(): Promise<string> {
       return { success: false, message: 'Error during logout' };
     }
   }
-  
+
   // Student Onboarding Methods
-  
+
   // Get student status
   static async getStudentStatus(): Promise<ApiResponse<StudentDetails>> {
     try {
@@ -551,8 +513,7 @@ static async getStudentId(): Promise<string> {
       };
     }
   }
-  
-  // Other methods remain the same...
+
   // Initiate email verification
   static async initiateVerification(
     email: string,
@@ -568,7 +529,7 @@ static async getStudentId(): Promise<string> {
       true
     );
   }
-  
+
   // Verify OTP for student verification
   static async verifyStudentOtp(requestId: string, otp: string): Promise<ApiResponse<any>> {
     return this.fetchData<any>(
@@ -578,7 +539,7 @@ static async getStudentId(): Promise<string> {
       true
     );
   }
-  
+
   // Resend OTP for student verification
   static async resendStudentOtp(requestId: string): Promise<ApiResponse<{
     requestId: string,
@@ -596,7 +557,7 @@ static async getStudentId(): Promise<string> {
       true
     );
   }
-  
+
   // Upload student ID document
   static async uploadStudentID(file: FormData): Promise<ApiResponse<any>> {
     try {
@@ -606,37 +567,20 @@ static async getStudentId(): Promise<string> {
         method: 'POST',
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
-          // Don't set Content-Type here, it will be set automatically for FormData
         },
         body: file,
       });
-      
 
-      // Handle non-JSON responses
       if (!response.ok) {
-        try {
-          const errorData = await response.json();
-          return {
-            success: false,
-            message: Array.isArray(errorData.message) ? errorData.message[0] : errorData.message || 'An error occurred',
-          };
-        } catch (jsonError) {
-          return {
-            success: false,
-            message: `Server error: ${response.status} ${response.statusText}`,
-          };
-        }
-      }
-      
-      try {
-        const data = await response.json();
-        return data as ApiResponse<any>;
-      } catch (jsonError) {
+        const errorData = await response.json();
         return {
           success: false,
-          message: 'Failed to parse server response',
+          message: Array.isArray(errorData.message) ? errorData.message[0] : errorData.message || 'An error occurred',
         };
       }
+      
+      const data = await response.json();
+      return data as ApiResponse<any>;
     } catch (error: any) {
       console.error('API Error:', error);
       return {
@@ -646,9 +590,8 @@ static async getStudentId(): Promise<string> {
     }
   }
 
-  
   // Discount related methods
-  
+
   // Get all discounts
   static async getDiscounts(): Promise<ApiResponse<Discount[]>> {
     return this.fetchData<Discount[]>(
@@ -658,7 +601,7 @@ static async getStudentId(): Promise<string> {
       true
     );
   }
-  
+
   // Get featured discounts
   static async getFeaturedDiscounts(): Promise<ApiResponse<Discount[]>> {
     return this.fetchData<Discount[]>(
@@ -668,7 +611,7 @@ static async getStudentId(): Promise<string> {
       true
     );
   }
-  
+
   // Get discount by ID
   static async getDiscountById(id: string): Promise<ApiResponse<Discount>> {
     return this.fetchData<Discount>(
@@ -678,7 +621,7 @@ static async getStudentId(): Promise<string> {
       true
     );
   }
-  
+
   // Get discounts by category
   static async getDiscountsByCategory(category: string): Promise<ApiResponse<Discount[]>> {
     return this.fetchData<Discount[]>(
@@ -688,7 +631,7 @@ static async getStudentId(): Promise<string> {
       true
     );
   }
-  
+
   // Get nearby discounts based on location
   static async getNearbyDiscounts(latitude: number, longitude: number, radius: number = 10): Promise<ApiResponse<Discount[]>> {
     return this.fetchData<Discount[]>(
@@ -698,19 +641,18 @@ static async getStudentId(): Promise<string> {
       true
     );
   }
-  
 
-static async redeemDiscount(discountId: string): Promise<ApiResponse<RedeemDiscountResponse>> {
-  const studentId = await this.getStudentId();
+  static async redeemDiscount(discountId: string): Promise<ApiResponse<RedeemDiscountResponse>> {
+    const studentId = await this.getStudentId();
 
-  return this.fetchData<RedeemDiscountResponse>(
-    '/redeem-discount',
-    'POST',
-    { studentId, discountId },
-    true
-  );
-}
-  
+    return this.fetchData<RedeemDiscountResponse>(
+      '/redeem-discount',
+      'POST',
+      { studentId, discountId },
+      true
+    );
+  }
+
   // Get user's redeemed discounts
   static async getRedeemedDiscounts(): Promise<ApiResponse<Discount[]>> {
     return this.fetchData<Discount[]>(
@@ -721,43 +663,47 @@ static async redeemDiscount(discountId: string): Promise<ApiResponse<RedeemDisco
     );
   }
 
+  // Create a payment order
+  static async createPaymentOrder(): Promise<ApiResponse<{ order: any }>> {
+    return this.fetchData<{ order: any }>(
+      '/payment/checkout',
+      'POST',
+      undefined,
+      true
+    );
+  }
 
-// Create a payment order
-static async createPaymentOrder(): Promise<ApiResponse<{ order: any }>> {
-  return this.fetchData<{ order: any }>(
-    '/payment/checkout',
-    'POST',
-    undefined,
-    true
-  );
-}
+  // Verify the payment
+  static async verifyPayment(paymentData: {
+    razorpay_order_id: string;
+    razorpay_payment_id: string;
+    razorpay_signature: string;
+  }): Promise<ApiResponse<any>> {
+    return this.fetchData<any>(
+      '/payment/verify',
+      'POST',
+      paymentData,
+      true
+    );
+  }
 
-// Verify the payment
-static async verifyPayment(paymentData: {
-  razorpay_order_id: string;
-  razorpay_payment_id: string;
-  razorpay_signature: string;
-}): Promise<ApiResponse<any>> {
-  return this.fetchData<any>(
-    '/payment/verify',
-    'POST',
-    paymentData,
-    true
-  );
-}
-
-
-
-// Create a new event
+  /**
+ * Creates a new event
+ * @param eventData - The event data to create
+ * @returns Promise<ApiResponse<Event>> - The created event
+ */
 static async createEvent(eventData: {
   title: string;
-  description: string;
+  description?: string;
+  venue?: string;
   startTime: string;
   endTime: string;
-  backgroundImage: string;
-  termsCondition: string;
-  venue: string;
   eventScope: 'UNIVERSITY' | 'PUBLIC';
+  timeZone: string;
+  eventType: 'IN_PERSON' | 'ONLINE' | 'HYBRID';
+  onlineLink?: string;
+  termsCondition?: string;
+  backgroundImage?: string;
 }): Promise<ApiResponse<Event>> {
   return this.fetchData<Event>(
     '/event/create',
@@ -767,51 +713,101 @@ static async createEvent(eventData: {
   );
 }
 
-// Get events based on status and scope
-static async getEvents(filters: {
-  status: 'UPCOMING' | 'LIVE' | 'COMPLETED';
-  eventScope: 'UNIVERSITY' | 'PUBLIC';
-}): Promise<ApiResponse<Event[]>> {
-  console.log('Here:',AsyncStorage.getItem(TOKEN_KEY));
-  return this.fetchData<Event[]>(
-    '/event',
-    'POST',
-    filters,
-    true
-  );
+/**
+ * Fetches events based on eventScope
+ * @param eventScope - The scope of events to fetch ('UNIVERSITY' or 'PUBLIC')
+ * @returns Promise<ApiResponse<Event[]>> - List of events
+ */
+static async getEvents(eventScope: 'UNIVERSITY' | 'PUBLIC'): Promise<ApiResponse<Event[]>> {
+  try {
+    // Get the token and decode it to display the identityId
+    const token = await AsyncStorage.getItem(TOKEN_KEY);
+    if (token) {
+      try {
+        // Split the JWT and decode the payload
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          const payload = JSON.parse(atob(parts[1]));
+          console.log('Token payload:', payload);
+          console.log('Identity ID from token:', payload.identityId);
+        }
+      } catch (error) {
+        console.error('Error decoding token:', error);
+      }
+    }
+
+    console.log('Fetching events with scope:', eventScope);
+    
+    // Check student status before making events request
+    const studentStatus = await this.getStudentStatus();
+    console.log('Student status response:', studentStatus);
+    
+    const response = await this.fetchData<Event[]>(
+      `/event/events?eventScope=${eventScope}`,
+      'GET',
+      undefined,
+      true
+    );
+    
+    console.log('Events response:', response);
+    return response;
+  } catch (error: any) {
+    console.error('Error in getEvents:', error);
+    return {
+      success: false,
+      message: error.message || 'Failed to fetch events',
+    };
+  }
 }
 
-// Register a student for an event
+/**
+ * Registers a student for an event
+ * @param eventId - The ID of the event to register for
+ * @returns Promise<ApiResponse<RegisteredEvent>> - Registration confirmation
+ */
 static async registerForEvent(eventId: string): Promise<ApiResponse<RegisteredEvent>> {
   return this.fetchData<RegisteredEvent>(
-    '/event/registered',
+    '/event/register',
     'POST',
     { eventId },
     true
   );
 }
 
-// Get all students registered for an event
+/**
+ * Fetches registered students for an event
+ * @param eventId - The ID of the event
+ * @returns Promise<ApiResponse<RegisteredStudent[]>> - List of registered students
+ */
 static async getRegisteredStudents(eventId: string): Promise<ApiResponse<RegisteredStudent[]>> {
   return this.fetchData<RegisteredStudent[]>(
-    `/event?id=${eventId}`,
+    `/event/registered?id=${eventId}`,
     'GET',
     undefined,
     true
   );
 }
 
-// Delete an event
-static async deleteEvent(eventId: string): Promise<ApiResponse<{eventId: string}>> {
-  return this.fetchData<{eventId: string}>(
-    `/event/delete?id=${eventId}`,
+/**
+ * Deletes an event
+ * @param eventId - The ID of the event to delete
+ * @returns Promise<ApiResponse<{ eventId: string }>> - Deletion confirmation
+ */
+static async deleteEvent(eventId: string): Promise<ApiResponse<{ eventId: string }>> {
+  return this.fetchData<{ eventId: string }>(
+    `/event/${eventId}`,
     'DELETE',
     undefined,
     true
   );
 }
 
-// Edit an event
+/**
+ * Updates an event
+ * @param eventId - The ID of the event to update
+ * @param eventData - The event data to update
+ * @returns Promise<ApiResponse<Event>> - The updated event
+ */
 static async editEvent(
   eventId: string,
   eventData: Partial<{
@@ -819,20 +815,165 @@ static async editEvent(
     description: string;
     startTime: string;
     endTime: string;
+    eventScope: 'UNIVERSITY' | 'PUBLIC';
+    timeZone: string;
+    eventType: 'IN_PERSON' | 'ONLINE' | 'HYBRID';
+    onlineLink: string;
     backgroundImage: string;
     termsCondition: string;
     venue: string;
-    eventScope: 'UNIVERSITY' | 'PUBLIC';
   }>
 ): Promise<ApiResponse<Event>> {
   return this.fetchData<Event>(
-    `/event/edit?id=${eventId}`,
+    `/event/${eventId}`,
     'PUT',
     eventData,
     true
   );
 }
-  
+
+/**
+ * Fetches event by ID
+ * @param eventId - The ID of the event
+ * @returns Promise<ApiResponse<Event>> - Event details
+ */
+static async getEventById(eventId: string): Promise<ApiResponse<Event>> {
+  return this.fetchData<Event>(
+    `/event/${eventId}`,
+    'GET',
+    undefined,
+    true
+  );
+}
+
+/**
+ * Cancels a user's registration for an event
+ * @param eventId - The ID of the event
+ * @returns Promise<ApiResponse<{ eventId: string }>> - Cancellation confirmation
+ */
+static async cancelEventRegistration(eventId: string): Promise<ApiResponse<{ eventId: string }>> {
+  return this.fetchData<{ eventId: string }>(
+    `/event/register/${eventId}`,
+    'DELETE',
+    undefined,
+    true
+  );
+}
+  // User Profile Management
+
+  /**
+   * Fetches the current user's profile information
+   * @returns Promise<ApiResponse<User>> - The user's profile data
+   */
+  static async getUserProfile(): Promise<ApiResponse<User>> {
+    try {
+      const response = await this.fetchData<User>(
+        '/user/profile',
+        'GET',
+        undefined,
+        true
+      );
+      if (response.success && response.data) {
+        // Update stored user info
+        await AsyncStorage.setItem(USER_KEY, JSON.stringify(response.data));
+      }
+      return response;
+    } catch (error: any) {
+      console.error('Error fetching user profile:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to fetch user profile',
+      };
+    }
+  }
+
+  /**
+   * Updates the current user's profile information
+   * @param userData - Partial user data to update
+   * @returns Promise<ApiResponse<User>> - Updated user profile
+   */
+  static async updateUserProfile(userData: Partial<User>): Promise<ApiResponse<User>> {
+    try {
+      const response = await this.fetchData<User>(
+        '/user/profile',
+        'PUT',
+        userData,
+        true
+      );
+      if (response.success && response.data) {
+        // Update stored user info
+        await AsyncStorage.setItem(USER_KEY, JSON.stringify(response.data));
+      }
+      return response;
+    } catch (error: any) {
+      console.error('Error updating user profile:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to update user profile',
+      };
+    }
+  }
+
+  // Event Attendance Tracking
+
+  /**
+   * Marks attendance for an event
+   * @param eventId - The ID of the event
+   * @param userId - The ID of the user attending
+   * @returns Promise<ApiResponse<{ eventId: string, userId: string }>> - Attendance confirmation
+   */
+  static async markEventAttendance(eventId: string, userId: string): Promise<ApiResponse<{ eventId: string, userId: string }>> {
+    return this.fetchData<{ eventId: string, userId: string }>(
+      '/event/attendance',
+      'POST',
+      { eventId, userId },
+      true
+    );
+  }
+
+  /**
+   * Gets the list of events the user has registered for
+   * @param userId - The ID of the user
+   * @returns Promise<ApiResponse<RegisteredEvent[]>> - List of registered events
+   */
+  static async getUserRegisteredEvents(userId: string): Promise<ApiResponse<RegisteredEvent[]>> {
+    return this.fetchData<RegisteredEvent[]>(
+      `/event/registered/${userId}`,
+      'GET',
+      undefined,
+      true
+    );
+  }
+
+  /**
+   * Gets the list of events the user has attended
+   * @param userId - The ID of the user
+   * @returns Promise<ApiResponse<Event[]>> - List of attended events
+   */
+  static async getUserAttendedEvents(userId: string): Promise<ApiResponse<Event[]>> {
+    return this.fetchData<Event[]>(
+      `/event/attended/${userId}`,
+      'GET',
+      undefined,
+      true
+    );
+  }
+
+  // Utility Methods
+
+  /**
+   * Checks if the user has a premium subscription
+   * @returns Promise<ApiResponse<{ isPremium: boolean }>> - Premium status
+   */
+  static async checkPremiumStatus(): Promise<ApiResponse<{ isPremium: boolean }>> {
+    return this.fetchData<{ isPremium: boolean }>(
+      '/user/premium-status',
+      'GET',
+      undefined,
+      true
+    );
+  }
+
 }
 
 export default ApiService;

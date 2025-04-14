@@ -1,5 +1,5 @@
 import React from 'react';
-import Svg, { Path, G, Circle, Rect } from 'react-native-svg';
+import Svg, { Path, G, Circle, Rect, Line } from 'react-native-svg';
 
 interface IconProps {
   size?: number;
@@ -370,6 +370,395 @@ export const CalendarIcon: React.FC<IconProps> = ({ size = 24, color = '#000', f
   );
 };
 
+export const UsersIcon: React.FC<IconProps> = ({ size = 24, color = '#000', filled = false, ...props }) => {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" {...props}>
+      {filled ? (
+        <G>
+          <Circle cx="9" cy="7" r="4" fill={color} />
+          <Circle cx="15" cy="7" r="4" fill={color} />
+          <Path
+            d="M6 14C6 12.3431 7.34315 11 9 11H15C16.6569 11 18 12.3431 18 14V17H6V14Z"
+            fill={color}
+          />
+        </G>
+      ) : (
+        <G>
+          <Circle cx="9" cy="7" r="4" stroke={color} strokeWidth="2" />
+          <Circle cx="15" cy="7" r="4" stroke={color} strokeWidth="2" />
+          <Path
+            d="M6 14C6 12.3431 7.34315 11 9 11H15C16.6569 11 18 12.3431 18 14V17H6V14Z"
+            stroke={color}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </G>
+      )}
+    </Svg>
+  );
+};
+
+export const VideoIcon: React.FC<IconProps> = ({ size = 24, color = '#000', filled = false, ...props }) => {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" {...props}>
+      {filled ? (
+        <G>
+          <Rect
+            x="3"
+            y="3"
+            width="18"
+            height="18"
+            rx="2"
+            fill={color}
+            stroke={color}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <Path
+            d="M10 8V16L15 12L10 8Z"
+            fill="white"
+          />
+        </G>
+      ) : (
+        <G>
+          <Rect
+            x="3"
+            y="3"
+            width="18"
+            height="18"
+            rx="2"
+            stroke={color}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <Path
+            d="M10 8V16L15 12L10 8Z"
+            stroke={color}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </G>
+      )}
+    </Svg>
+  );
+};
+
+
+export const GlobeIcon: React.FC<IconProps> = ({ 
+  size = 24, 
+  color = '#000', 
+  filled = false, 
+  ...props 
+}) => {
+  return (
+    <Svg 
+      width={size} 
+      height={size} 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      {...props}
+    >
+      {/* Outer circle/stroke */}
+      {filled ? (
+        <Circle 
+          cx="12" 
+          cy="12" 
+          r="10" 
+          fill={color} 
+          fillOpacity="0.2" 
+        />
+      ) : (
+        <Circle 
+          cx="12" 
+          cy="12" 
+          r="10" 
+          stroke={color} 
+          strokeWidth="1.5" 
+        />
+      )}
+      
+      {/* Globe wireframe with more detailed continents */}
+      <G>
+        <Path
+          d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2Z"
+          stroke={color}
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        
+        {/* Simplified continent outlines */}
+        <Path
+          d="M12 2C12 2 9 5 9 12C9 19 12 22 12 22"
+          stroke={color}
+          strokeWidth="1.5"
+          strokeOpacity="0.6"
+        />
+        
+        <Path
+          d="M22 12C22 12 19 9 12 9C5 9 2 12 2 12"
+          stroke={color}
+          strokeWidth="1.5"
+          strokeOpacity="0.6"
+        />
+        
+        {/* Subtle meridian lines */}
+        <Path
+          d="M12 2V22"
+          stroke={color}
+          strokeWidth="1"
+          strokeOpacity="0.3"
+          strokeDasharray="2 2"
+        />
+        
+        <Path
+          d="M2 12H22"
+          stroke={color}
+          strokeWidth="1"
+          strokeOpacity="0.3"
+          strokeDasharray="2 2"
+        />
+      </G>
+    </Svg>
+  );
+};
+
+
+export const UniversityIcon: React.FC<IconProps> = ({ 
+  size = 24, 
+  color = '#000', 
+  filled = false, 
+  ...props 
+}) => {
+  return (
+    <Svg 
+      width={size} 
+      height={size} 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      {...props}
+    >
+      {filled ? (
+        <>
+          {/* Main building body */}
+          <Path
+            d="M4 10L12 4L20 10V20H4V10Z"
+            fill={color}
+            fillOpacity="0.2"
+            stroke={color}
+            strokeWidth="1.5"
+          />
+          
+          {/* Columns/entrance */}
+          <Rect 
+            x="9" 
+            y="14" 
+            width="6" 
+            height="6" 
+            fill={color}
+            fillOpacity="0.1"
+            stroke={color}
+            strokeWidth="1.5"
+          />
+        </>
+      ) : (
+        <>
+          {/* Outline of university building */}
+          <Path
+            d="M4 10L12 4L20 10V20H4V10Z"
+            stroke={color}
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          
+          {/* Columns/entrance */}
+          <Rect 
+            x="9" 
+            y="14" 
+            width="6" 
+            height="6" 
+            stroke={color}
+            strokeWidth="1.5"
+          />
+        </>
+      )}
+      
+      {/* Window details */}
+      <Line 
+        x1="7" 
+        y1="14" 
+        x2="7" 
+        y2="16" 
+        stroke={color} 
+        strokeWidth="1.5"
+      />
+      <Line 
+        x1="17" 
+        y1="14" 
+        x2="17" 
+        y2="16" 
+        stroke={color} 
+        strokeWidth="1.5"
+      />
+    </Svg>
+  );
+};
+
+export const PublicIcon: React.FC<IconProps> = ({ 
+  size = 24, 
+  color = '#000', 
+  filled = false, 
+  ...props 
+}) => {
+  return (
+    <Svg 
+      width={size} 
+      height={size} 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      {...props}
+    >
+      {filled ? (
+        <>
+          {/* Public building base */}
+          <Path
+            d="M3 22H21"
+            stroke={color}
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
+          <Path
+            d="M4 19H20V22H4V19Z"
+            fill={color}
+            fillOpacity="0.2"
+            stroke={color}
+            strokeWidth="1.5"
+          />
+          
+          {/* Building structure */}
+          <Path
+            d="M5 10L12 4L19 10V19H5V10Z"
+            fill={color}
+            fillOpacity="0.1"
+            stroke={color}
+            strokeWidth="1.5"
+          />
+        </>
+      ) : (
+        <>
+          {/* Outline of public building */}
+          <Path
+            d="M3 22H21"
+            stroke={color}
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
+          <Path
+            d="M4 19H20V22H4V19Z"
+            stroke={color}
+            strokeWidth="1.5"
+          />
+          <Path
+            d="M5 10L12 4L19 10V19H5V10Z"
+            stroke={color}
+            strokeWidth="1.5"
+          />
+        </>
+      )}
+      
+      {/* Columns/windows */}
+      <Line 
+        x1="8" 
+        y1="14" 
+        x2="8" 
+        y2="17" 
+        stroke={color} 
+        strokeWidth="1.5"
+      />
+      <Line 
+        x1="12" 
+        y1="14" 
+        x2="12" 
+        y2="17" 
+        stroke={color} 
+        strokeWidth="1.5"
+      />
+      <Line 
+        x1="16" 
+        y1="14" 
+        x2="16" 
+        y2="17" 
+        stroke={color} 
+        strokeWidth="1.5"
+      />
+    </Svg>
+  );
+};
+
+export const SearchIcon: React.FC<IconProps> = ({ 
+  size = 24, 
+  color = '#000', 
+  filled = false, 
+  ...props 
+}) => {
+  return (
+    <Svg 
+      width={size} 
+      height={size} 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      {...props}
+    >
+      {filled ? (
+        <>
+          {/* Filled search icon with a more dynamic look */}
+          <Circle 
+            cx="11" 
+            cy="11" 
+            r="8" 
+            fill={color} 
+            fillOpacity="0.2" 
+          />
+          <Circle 
+            cx="11" 
+            cy="11" 
+            r="8" 
+            stroke={color} 
+            strokeWidth="2" 
+          />
+          <Path
+            d="M20 20L16 16"
+            stroke={color}
+            strokeWidth="2.5"
+            strokeLinecap="round"
+          />
+        </>
+      ) : (
+        <>
+          {/* Outline search icon with refined details */}
+          <Circle 
+            cx="11" 
+            cy="11" 
+            r="8" 
+            stroke={color} 
+            strokeWidth="2" 
+          />
+          <Path
+            d="M20 20L16 16"
+            stroke={color}
+            strokeWidth="2.5"
+            strokeLinecap="round"
+          />
+        </>
+      )}
+    </Svg>
+  );
+};
 
 // Plus Icon
 export const PlusIcon: React.FC<IconProps> = ({ size = 24, color = '#000', filled = false, ...props }) => {
@@ -423,6 +812,44 @@ export const PlusIcon: React.FC<IconProps> = ({ size = 24, color = '#000', fille
     </Svg>
   );
 };
+
+
+export const ChevronDownIcon: React.FC<IconProps> = ({ 
+  size = 24, 
+  color = '#000', 
+  filled = false, 
+  ...props 
+}) => {
+  return (
+    <Svg 
+      width={size} 
+      height={size} 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      {...props}
+    >
+      {filled ? (
+        <Path
+          d="M6 9L12 15L18 9"
+          fill="none"
+          stroke={color}
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      ) : (
+        <Path
+          d="M6 9L12 15L18 9"
+          stroke={color}
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      )}
+    </Svg>
+  );
+};
+
 
 export const ClockIcon: React.FC<IconProps> = ({ size = 24, color = '#000' }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">

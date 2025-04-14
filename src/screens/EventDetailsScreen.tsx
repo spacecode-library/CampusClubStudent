@@ -3,7 +3,6 @@ import {
   View,
   StyleSheet,
   ScrollView,
-  Image,
   TouchableOpacity,
   ActivityIndicator,
   Share,
@@ -11,6 +10,7 @@ import {
   Linking,
   Animated,
   Modal,
+  Image,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RouteProp } from '@react-navigation/native';
@@ -29,9 +29,8 @@ import {
   EditIcon,
   TrashIcon,
   InfoIcon,
-
 } from '../components/NavigationIcons';
-import { AlertCircleIcon, XIcon, CheckCircleIcon} from '../components/icons/index';
+import { AlertCircleIcon, XIcon, CheckCircleIcon } from '../components/icons/index';
 import * as Haptics from 'expo-haptics';
 import EventStatusBadge from '../components/EventStatusBadge';
 import ApiService, { Event, RegisteredStudent } from '../services/ApiService';
@@ -52,7 +51,6 @@ interface EventDetailsScreenProps {
   route: EventDetailsScreenRouteProp;
 }
 
-// Alert types for in-screen alerts
 type AlertType = 'error' | 'success' | 'info' | null;
 
 interface AlertData {
@@ -62,11 +60,10 @@ interface AlertData {
 }
 
 const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, route }) => {
-  const { eventId } = route.params;
+  const { eventId, eventScope = 'PUBLIC' } = route.params; // Default to 'PUBLIC' if eventScope is undefined
   const { colors, theme } = useTheme();
   const insets = useSafeAreaInsets();
 
-  // State variables
   const [loading, setLoading] = useState(true);
   const [event, setEvent] = useState<Event | null>(null);
   const [registeredStudents, setRegisteredStudents] = useState<RegisteredStudent[]>([]);
@@ -79,11 +76,10 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
   const [deleting, setDeleting] = useState(false);
   const [alert, setAlert] = useState<AlertData | null>(null);
 
-  // Animation refs
   const modalAnimation = useRef(new Animated.Value(0)).current;
   const alertAnimation = useRef(new Animated.Value(0)).current;
+  const registerButtonAnimation = useRef(new Animated.Value(1)).current;
 
-  // Show in-screen alert
   const showAlert = (type: AlertType, message: string, title?: string, duration = 5000) => {
     setAlert({ type, message, title });
 
@@ -101,7 +97,6 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
     }
   };
 
-  // Hide in-screen alert
   const hideAlert = () => {
     Animated.timing(alertAnimation, {
       toValue: 0,
@@ -112,51 +107,46 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
     });
   };
 
-  // Fetch event data and check if user is registered
   useEffect(() => {
     const fetchEventDetails = async () => {
       setLoading(true);
       try {
+        console.log('Received eventId in EventDetailsScreen:', eventId);
+        console.log('Received eventScope in EventDetailsScreen:', eventScope);
         const userJson = await AsyncStorage.getItem('@campusclub:user');
         const currentUserId = userJson ? JSON.parse(userJson).id : null;
+        console.log('Current user ID:', currentUserId);
         setUserId(currentUserId);
 
-        const upcomingResponse = await ApiService.getEvents({
-          status: 'UPCOMING',
-          eventScope: 'UNIVERSITY',
-        });
+        const response = await ApiService.getEvents(eventScope);
+        console.log('API response from getEvents:', response);
 
-        const liveResponse = await ApiService.getEvents({
-          status: 'LIVE',
-          eventScope: 'UNIVERSITY',
-        });
+        if (response.success && response.data) {
+          const allEvents = response.data;
+          console.log('All events fetched:', allEvents.map(e => ({ _id: e._id, title: e.title })));
+          const foundEvent = allEvents.find((e) => e._id === eventId);
+          console.log('Found event:', foundEvent);
 
-        const completedResponse = await ApiService.getEvents({
-          status: 'COMPLETED',
-          eventScope: 'UNIVERSITY',
-        });
+          if (foundEvent) {
+            setEvent(foundEvent);
+            setIsCreator(foundEvent.userId === currentUserId);
 
-        const allEvents = [
-          ...(upcomingResponse.success && upcomingResponse.data ? upcomingResponse.data : []),
-          ...(liveResponse.success && liveResponse.data ? liveResponse.data : []),
-          ...(completedResponse.success && completedResponse.data ? completedResponse.data : []),
-        ];
+            const registrationsResponse = await ApiService.getRegisteredStudents(foundEvent._id);
+            console.log('Registrations response:', registrationsResponse);
 
-        const foundEvent = allEvents.find((e) => e._id === eventId);
-
-        if (foundEvent) {
-          setEvent(foundEvent);
-          setIsCreator(foundEvent.userId === currentUserId);
-
-          const registrationsResponse = await ApiService.getRegisteredStudents(foundEvent._id);
-
-          if (registrationsResponse.success && registrationsResponse.data) {
-            setRegisteredStudents(registrationsResponse.data);
-            const isRegistered = registrationsResponse.data.some(
-              (student) => student._id === currentUserId
-            );
-            setUserRegistered(isRegistered);
+            if (registrationsResponse.success && registrationsResponse.data) {
+              setRegisteredStudents(registrationsResponse.data);
+              const isRegistered = registrationsResponse.data.some(
+                (student) => student._id === currentUserId
+              );
+              setUserRegistered(isRegistered);
+              console.log('User registered status:', isRegistered);
+            }
+          } else {
+            console.log('Event not found for eventId:', eventId);
           }
+        } else {
+          showAlert('error', 'Failed to load event details', 'Error');
         }
       } catch (error) {
         console.error('Error fetching event details:', error);
@@ -167,13 +157,12 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
     };
 
     fetchEventDetails();
-  }, [eventId]);
+  }, [eventId, eventScope]);
 
-  // Format date for display
-  const formatEventDate = (startTime: string, endTime: string) => {
+  const formatEventDate = (startTime: number, endTime: number) => {
     try {
-      const start = new Date(startTime);
-      const end = new Date(endTime);
+      const start = new Date(startTime * 1000);
+      const end = new Date(endTime * 1000);
 
       const dateStr = format(start, 'EEEE, MMMM d, yyyy');
       const startTimeStr = format(start, 'h:mm a');
@@ -192,7 +181,6 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
     }
   };
 
-  // Handle share event
   const handleShare = async () => {
     if (!event) return;
 
@@ -208,7 +196,6 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
     }
   };
 
-  // Handle register for event
   const handleRegister = async () => {
     if (!event || registering) return;
 
@@ -236,6 +223,9 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
 
           setRegisteredStudents((prev) => [...prev, newRegisteredStudent]);
           setShowConfetti(true);
+          
+          // Show success alert
+          showAlert('success', 'Successfully registered for this event!', 'Registration Complete');
         }
       } else {
         showAlert('error', response.message?.toString() || 'Failed to register for event', 'Registration Failed');
@@ -248,7 +238,6 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
     }
   };
 
-  // Handle edit event
   const handleEdit = () => {
     if (!event) return;
 
@@ -259,7 +248,6 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
     navigation.navigate('EditEvent', { eventId: event._id });
   };
 
-  // Show delete modal
   const handleShowDeleteModal = () => {
     if (!event) return;
 
@@ -276,7 +264,6 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
     }).start();
   };
 
-  // Hide delete modal
   const handleHideDeleteModal = () => {
     Animated.timing(modalAnimation, {
       toValue: 0,
@@ -291,7 +278,6 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
     }
   };
 
-  // Handle delete event
   const handleDelete = async () => {
     if (!event) return;
 
@@ -317,7 +303,6 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
     }
   };
 
-  // Handle location press
   const handleLocationPress = () => {
     if (!event) return;
 
@@ -331,15 +316,16 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
     }
   };
 
-  // Format date object from event if available
   const formattedDateTime = event
     ? formatEventDate(event.startTime, event.endTime)
     : { date: '', time: '' };
 
-  // Determine if the event is upcoming and can be registered for
+  // Show register button for upcoming events only
   const canRegister = event?.status === 'UPCOMING' && !userRegistered && !isCreator;
+  
+  // Show event ended message for completed events
+  const showEventEnded = event?.status === 'COMPLETED' && !isCreator;
 
-  // Render alert icon based on type
   const renderAlertIcon = () => {
     if (!alert) return null;
 
@@ -355,7 +341,6 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
     }
   };
 
-  // Get alert background color based on type
   const getAlertBackgroundColor = () => {
     if (!alert) return colors.card;
 
@@ -371,7 +356,6 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
     }
   };
 
-  // Get alert text color based on type
   const getAlertTextColor = () => {
     if (!alert) return colors.text;
 
@@ -387,7 +371,6 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
     }
   };
 
-  // Show loading skeleton if data is being fetched
   if (loading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -424,7 +407,6 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
     );
   }
 
-  // Show error message if event not found
   if (!event) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -448,7 +430,7 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
             style={[styles.errorButton, { backgroundColor: colors.primary }]}
             onPress={() => navigation.goBack()}
           >
-            <Text variant="labelLarge" color={colors.primary}>
+            <Text variant="labelLarge" color="white">
               Go Back
             </Text>
           </TouchableOpacity>
@@ -461,7 +443,6 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar style="light" />
 
-      {/* In-screen alert */}
       {alert && (
         <Animated.View
           style={[
@@ -514,7 +495,6 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
         </Animated.View>
       )}
 
-      {/* Confetti animation on successful registration */}
       {showConfetti && (
         <ConfettiCannon
           count={200}
@@ -526,7 +506,6 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
         />
       )}
 
-      {/* Header with back button and actions */}
       <View style={[styles.header, { paddingTop: insets.top }]}>
         <TouchableOpacity
           style={styles.backButton}
@@ -577,17 +556,20 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + (canRegister ? 80 : 20) }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Event image with gradient overlay */}
         <View style={styles.imageContainer}>
-          <Image source={{ uri: event.backgroundImage }} style={styles.eventImage} resizeMode="cover" />
+          {/* Add Image component */}
+          <Image 
+            source={{ uri: event.backgroundImage || 'https://via.placeholder.com/300x200?text=Event' }}
+            style={styles.eventImage}
+            resizeMode="cover"
+          />
           <LinearGradient
             colors={['transparent', 'rgba(0,0,0,0.7)']}
             style={styles.imageGradient}
           />
-
           <View style={styles.statusBadgeContainer}>
             <EventStatusBadge status={event.status} large />
           </View>
@@ -704,20 +686,12 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
             </View>
           )}
 
-          {canRegister && (
-            <TouchableOpacity
-              style={[styles.registerButton, { backgroundColor: colors.primary }]}
-              onPress={handleRegister}
-              disabled={registering}
-            >
-              {registering ? (
-                <ActivityIndicator color={colors.primary} />
-              ) : (
-                <Text variant="labelLarge" color={colors.primary}>
-                  Register for Event
-                </Text>
-              )}
-            </TouchableOpacity>
+          {showEventEnded && (
+            <View style={[styles.registeredBadge, { backgroundColor: `${colors.textSecondary}20` }]}>
+              <Text variant="bodyMedium" color={colors.textSecondary} style={styles.registeredText}>
+                This event has ended
+              </Text>
+            </View>
           )}
 
           {userRegistered && !isCreator && (
@@ -740,7 +714,25 @@ const EventDetailsScreen: React.FC<EventDetailsScreenProps> = ({ navigation, rou
         </View>
       </ScrollView>
 
-      {/* Delete Confirmation Modal */}
+      {/* Floating Register Button */}
+      {canRegister && (
+        <View style={[styles.floatingRegisterContainer, { backgroundColor: colors.background }]}>
+          <TouchableOpacity
+            style={[styles.floatingRegisterButton, { backgroundColor: colors.primary }]}
+            onPress={handleRegister}
+            disabled={registering}
+          >
+            {registering ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Text variant="labelLarge" color="white" style={styles.registerButtonText}>
+                Register for Event
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
+
       <Modal
         visible={showDeleteModal}
         transparent={true}
@@ -856,10 +848,12 @@ const styles = StyleSheet.create({
     height: moderateScale(300),
     width: '100%',
     position: 'relative',
+    backgroundColor: '#2A2A2A', // Fallback color
   },
   eventImage: {
     width: '100%',
     height: '100%',
+    position: 'absolute',
   },
   imageGradient: {
     position: 'absolute',
@@ -943,6 +937,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: SPACING.lg,
   },
+  floatingRegisterContainer: {
+    position: 'absolute',
+    left: SPACING.lg,
+    right: SPACING.lg,
+    bottom: SPACING.lg,
+    borderRadius: BORDER_RADIUS.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
+    padding: SPACING.xs,
+  },
+  floatingRegisterButton: {
+    height: moderateScale(56),
+    borderRadius: BORDER_RADIUS.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  registerButtonText: {
+    fontWeight: '600',
+  },
   registeredBadge: {
     borderRadius: BORDER_RADIUS.md,
     paddingVertical: SPACING.md,
@@ -977,7 +993,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.xl,
     borderRadius: BORDER_RADIUS.md,
   },
-  // Alert styles
   alertContainer: {
     position: 'absolute',
     top: Platform.OS === 'ios' ? 60 : 40,
@@ -1014,7 +1029,6 @@ const styles = StyleSheet.create({
     padding: SPACING.xs,
     marginLeft: SPACING.xs,
   },
-  // Delete modal styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',

@@ -83,10 +83,10 @@ export type RootStackParamList = {
   ActiveRedemptions: { redemptionId: string };
   RedemptionHistory: undefined;
   // Event Screens
-  EventDetails: { eventId: string };
+  EventDetails: { eventId: string; eventScope?: 'UNIVERSITY' | 'PUBLIC' }; // Updated to include eventScope
   CreateEvent: undefined;
   EditEvent: { eventId: string };
-  EventsList: { status: 'UPCOMING' | 'LIVE' | 'COMPLETED' };
+  EventsList: { status: 'UPCOMING' | 'LIVE' | 'COMPLETED'; scope?: 'PUBLIC' | 'UNIVERSITY' };
   EventAttendees: { eventId: string };
   // Individual tab screens (needed for type safety)
   Home: undefined;
